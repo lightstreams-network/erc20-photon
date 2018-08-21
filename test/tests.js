@@ -299,6 +299,46 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
     assert.equal(1000000000000000000, weiRaised);
   });
 
+  // updateRate(uint256)
+  it('Will not update the rate if it is over 10 percent of the initial rate', async ()=> {
+    const pthInWei = web3.utils.toWei('3500', 'ether');
+    const bigNumber = web3.utils.toBN(pthInWei);
+
+    try{
+      await sampleCrowdsaleContract.methods.updateRate(bigNumber).send({ from: accounts[0], gas: '4712388' });
+      assert.equal(true, false);
+    } catch(error) {
+      assert.equal(true, true);
+    }
+  });
+
+  // updateRate(uint256)
+  it('Will not update the rate if it is under 10 percent of the initial rate', async ()=> {
+    const pthInWei = web3.utils.toWei('2000', 'ether');
+    const bigNumber = web3.utils.toBN(pthInWei);
+
+    try{
+      await sampleCrowdsaleContract.methods.updateRate(bigNumber).send({ from: accounts[0], gas: '4712388' });
+      assert.equal(true, false);
+    } catch(error) {
+      assert.equal(true, true);
+    }
+  });
+
+  // updateRate(uint256)
+  it('Will update the rate if it is within 10 percent of the initial rate', async ()=> {
+    const pthInWei = web3.utils.toWei('3000', 'ether');
+    const bigNumber = web3.utils.toBN(pthInWei);
+
+    try{
+      await sampleCrowdsaleContract.methods.updateRate(bigNumber).send({ from: accounts[0], gas: '4712388' });
+      const rate = await sampleCrowdsaleContract.methods.rate().call();
+      printData('newRate', rate);
+    } catch(error) {
+      assert.equal(true, false);
+    }
+  });
+
   // ownerAddressToVestingContractAddress(address)
   it("Returns the vesting contract address of the beneficiary", async ()=> {
     vestingContractAddress = await sampleCrowdsaleContract.methods.ownerAddressToVestingContractAddress(accounts[1]).call();
@@ -390,54 +430,51 @@ describe("Tests the distribution contract", async ()=> {
   it("Is able to set an allocation", async ()=> {
 
     // Convert PTH to Big Number format
-    const PHT = web3.utils.toWei('15424000', 'ether');
-    const phtBigNumber = web3.utils.toBN(PHT);
+    const accountFourPHT = web3.utils.toWei('15424000', 'ether');
+    const acountFivePHT = web3.utils.toWei('10000000', 'ether');
+
+    const fourBigNumber = web3.utils.toBN(accountFourPHT);
+    const fiveBigNumber = web3.utils.toBN(acountFivePHT);
 
     try {
       const owner = await distributionContract.methods.owner().call();
-      printData('distributionContract', owner);
-      printData('startTime', startTime);
-     const allocation = await distributionContract.methods.setAllocation(accounts[4], phtBigNumber, 0).send({ from: accounts[0], gas: '4712388' });
-      //printData('allocation', allocation);
+
+      await distributionContract.methods.setAllocation(accounts[4], fourBigNumber, 0).send({ from: accounts[0], gas: '4712388' });
+      await distributionContract.methods.setAllocation(accounts[5], fiveBigNumber, 0).send({ from: accounts[0], gas: '4712388' });
     } catch(error){
       printData('Error - Is able to set an allocation', error);
     }
   });
 
-  it("Returns the address of the vesting contract for the investors address", async ()=> {
-    vestingContractAddress = await distributionContract.methods.ownerAddressToVestingContractAddress(accounts[4]).call();
-    printData('vestingContractAddress', vestingContractAddress);
+  it("Returns the allocation data", async ()=> {
+    printData('distributionContract', distributionContract.options.address);
+    const allocationData = await distributionContract.methods.getAllocationData(accounts[4]).call();
+    //printData('allocationData', allocationData);
   });
 
   it("Returns the balance for the team supply", async ()=> {
     const teamSupply = await distributionContract.methods.AVAILABLE_TEAM_SUPPLY().call();
-    printData('teamSupply', teamSupply);
+
+    assert.equal(40000000000000000000000000, teamSupply);
+  });
+
+  it("Releases the PHT to the team members wallet", async ()=> {
+    // Travel 3 months into the future for testing
+    await timeTravel(3600 * 24 * 30 * 3);
+
+    await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+    const releaseTransaction = await distributionContract.methods.release(accounts[4]).send({ from: accounts[0], gas: '4712388' });
+
+    //printData('releaseTransaction', releaseTransaction.events.LogUint);
   });
 
   // revoke (address _beneficiary)
   it("Is able to revoke an allocation", async ()=> {
-    await timeTravel(3600 * 24 * 30 * 5);
-
-    await mineBlock();
-
-    const distributionVestingContact = new web3.eth.Contract(tokenVestingAbi, vestingContractAddress);
-    const vestingOwner = await distributionVestingContact.methods.owner().call();
-    const revocable = await distributionVestingContact.methods.revocable().call();
-    const releasableAmount = await distributionVestingContact.methods.releasableAmount().call();
-    const vestedAmount = await distributionVestingContact.methods.vestedAmount().call();
-    const vestingTokenBalance = await lightstreamTokenContract.methods.balanceOf(vestingContractAddress).call();
-
-    printData('vestingOwner', vestingOwner);
-    printData('revokable', revocable);
-    printData('releasableAmount', releasableAmount);
-    printData('vestedAmount', vestedAmount);
-    printData('vestingTokenBalance', vestingTokenBalance);
-    printData('distributionContract', distributionContract.options.address);
-
     try {
-      const revoke = await distributionVestingContact.methods.revoke().send({ from: accounts[0], gas: '4712388' });
+      const revoke = await distributionContract.methods.revokeAllocation(accounts[5]).send({ from: accounts[0], gas: '4712388' });
 
-      //printData('revoke', revoke);
+      printData('revoke', revoke.events.LogUint);
     } catch(error){
       printData('Error - revokeAllocation', error);
     }
@@ -448,7 +485,7 @@ describe("Tests the distribution contract", async ()=> {
 
 
 /*
- * Tests the distribution of PTH and ETH to the beneficiary, and investor's wallet
+ * Tests the distribution of PTH and ETH to the beneficiary, investor's, and team member wallet
  */
 
 describe("The investors's wallet", async ()=> {
@@ -464,6 +501,30 @@ describe("The beneficiary's wallet", async ()=> {
     const ethBalance = await web3.eth.getBalance(accounts[9]);
 
     assert.equal(101000000000000000000, ethBalance);
+  });
+});
+
+describe("The team member's wallet", async ()=> {
+
+  it("Has the correct amount of PTH in it from release", async ()=> {
+    const lightstreamBalance = await lightstreamTokenContract.methods.balanceOf(accounts[4]).call();
+
+    assert.equal(1928000000000000000000000, lightstreamBalance);
+  });
+
+  it("Has the correct amount of PTH in it from revoke", async ()=> {
+    const lightstreamBalance = await lightstreamTokenContract.methods.balanceOf(accounts[5]).call();
+
+    assert.equal(1249999999999999999999998, lightstreamBalance);
+    printData('lightstreamBalance - Account 5', lightstreamBalance);
+  });
+});
+
+describe("The project wallet", async ()=> {
+  it("The OTHER pool has the correct amount of PTH in it from revoke", async ()=> {
+    const otherSupply = await distributionContract.methods.AVAILABLE_OTHER_SUPPLY().call();
+
+    printData('lightstreamBalance - otherSupply', otherSupply);
   });
 });
 

@@ -5,7 +5,6 @@ import '../token/ERC20.sol';
 import '../LightstreamToken.sol';
 import '../utils/SafeMath.sol';
 import '../utils/Ownable.sol';
-import './MonthlyTokenVesting.sol';
 
 /**
  * @title LIGHTSTREAM token team/foundation distribution
@@ -33,20 +32,35 @@ contract TeamDistribution is Ownable {
   uint256 public grandTotalClaimed = 0;
   uint256 public startTime;
 
-  mapping (address => address) public ownerAddressToVestingContractAddress;
+  /**
+   * @dev Creates Allocation with vesting information
+   * AllocationSupply Type of allocation
+   * beneficiary address of the beneficiary to whom vested tokens are transferred
+   * startTimestamp timestamp of when vesting begins
+   * endTimestamp timestamp of when vesting ends
+   * lockPeriod amount of time in seconds between withdrawal periods. (EG. 6 months or 1 month)
+   * initialAmount - the initial amount of tokens to be vested.
+   * revocable whether the vesting is revocable or not
+   * revoked whether the vesting has been revoked or not
+   */
 
-  // Allocation with vesting information
   struct Allocation {
-    uint8 AllocationSupply; // Type of allocation
-    uint256 endVesting;     // This is when the tokens are fully unvested
-    uint256 totalAllocated; // Total tokens allocated
+    uint8 AllocationSupply;
+    uint256 startTimestamp;
+    uint256 endTimestamp;
+    uint256 lockPeriod;
+    uint256 initialAmount;
     uint256 amountClaimed;
-    uint256 endCliff;
+    uint256 balance;
+    bool revocable;
+    bool revoked;
   }
   mapping (address => Allocation) public allocations;
   
-  event LogNewAllocation(address indexed _recipient, AllocationType indexed _fromSupply, uint256 _totalAllocated, uint256 _grandTotalAllocated);
-  event RevokedAllocation(address indexed _recipient);
+  event LogNewAllocation(address _recipient, AllocationType indexed _fromSupply, uint256 _totalAllocated, uint256 _grandTotalAllocated);
+  event RevokedAllocation(address _recipient);
+  event Released(address _recipient, uint256 _amount);
+  event LogUint(string _type, uint256 _uint);
 
   /**
     * @dev Constructor function - Set the Lightstream token address
@@ -70,50 +84,37 @@ contract TeamDistribution is Ownable {
   function setAllocation (address _beneficiary, uint256 _totalAllocated, AllocationType _supply) onlyOwner public {
 
     // check to make sure the recipients address current allocation is zero and that the amount being allocated is greater than zero
-    require(ownerAddressToVestingContractAddress[_beneficiary] == 0 && _totalAllocated > 0);
+    require(_totalAllocated > 0);
     // check to make sure the address exists so tokens don't get burnt
     require(_beneficiary != address(0));
-    address vestingContractAddress;
 
     if (_supply == AllocationType.TEAM) {
       AVAILABLE_TEAM_SUPPLY = AVAILABLE_TEAM_SUPPLY.sub(_totalAllocated);
 
-      vestingContractAddress = new MonthlyTokenVesting(token, _beneficiary, now, now + 720 days, now, 30 days, _totalAllocated, true);
-      token.safeTransfer(vestingContractAddress, _totalAllocated);
-
-      ownerAddressToVestingContractAddress[_beneficiary] = vestingContractAddress;
-      allocations[_beneficiary] = Allocation(uint8(AllocationType.TEAM), now + 720 days, _totalAllocated, 0, 0);
+      allocations[_beneficiary] = Allocation(uint8(AllocationType.TEAM), now, now + 720 days, 30 days, _totalAllocated, 0, _totalAllocated, true, false);
     } else if (_supply == AllocationType.SEED_INVESTORS) {
       AVAILABLE_SEED_INVESTORS_SUPPLY = AVAILABLE_SEED_INVESTORS_SUPPLY.sub(_totalAllocated);
 
-      vestingContractAddress = new MonthlyTokenVesting(token, _beneficiary, now, now + 150 days, now, 30 days, _totalAllocated, true);
-      token.safeTransfer(vestingContractAddress, _totalAllocated);
-
-      ownerAddressToVestingContractAddress[_beneficiary] = vestingContractAddress;
-      allocations[_beneficiary] = Allocation(uint8(AllocationType.SEED_INVESTORS), now + 150 days, _totalAllocated, 0, 0);
+      allocations[_beneficiary] = Allocation(uint8(AllocationType.SEED_INVESTORS), now, now + 150 days, 30 days, _totalAllocated, 0, _totalAllocated, true, false);
     } else if (_supply == AllocationType.FOUNDERS) {
       AVAILABLE_FOUNDERS_SUPPLY = AVAILABLE_FOUNDERS_SUPPLY.sub(_totalAllocated);
 
-      vestingContractAddress = new MonthlyTokenVesting(token, _beneficiary, now, now + 720 days, now, 30 days, _totalAllocated, true);
-      token.safeTransfer(vestingContractAddress, _totalAllocated);
-
-      ownerAddressToVestingContractAddress[_beneficiary] = vestingContractAddress;
-      allocations[_beneficiary] = Allocation(uint8(AllocationType.FOUNDERS), now + 720 days, _totalAllocated, 0, 0);
+      allocations[_beneficiary] = Allocation(uint8(AllocationType.FOUNDERS), now, now + 720 days, 30 days, _totalAllocated, 0, _totalAllocated, true, false);
     } else if (_supply == AllocationType.ADVISORS) {
       AVAILABLE_ADVISORS_SUPPLY = AVAILABLE_ADVISORS_SUPPLY.sub(_totalAllocated);
 
       token.safeTransfer(_beneficiary, _totalAllocated);
-      allocations[_beneficiary] = Allocation(uint8(AllocationType.ADVISORS), 0, _totalAllocated, 0, 0);
+      allocations[_beneficiary] = Allocation(uint8(AllocationType.ADVISORS),now, now, 0 days, _totalAllocated, 0, 0, false, false);
     } else if (_supply == AllocationType.CONSULTANTS) {
       AVAILABLE_CONSULTANTS_SUPPLY = AVAILABLE_CONSULTANTS_SUPPLY.sub(_totalAllocated);
 
       token.safeTransfer(_beneficiary, _totalAllocated);
-      allocations[_beneficiary] = Allocation(uint8(AllocationType.CONSULTANTS), 0, _totalAllocated, 0, 0);
+      allocations[_beneficiary] = Allocation(uint8(AllocationType.CONSULTANTS),now, now, 0 days, _totalAllocated, 0, 0, false, false);
     } else if (_supply == AllocationType.OTHER) {
       AVAILABLE_OTHER_SUPPLY = AVAILABLE_OTHER_SUPPLY.sub(_totalAllocated);
 
       token.safeTransfer(_beneficiary, _totalAllocated);
-      allocations[_beneficiary] = Allocation(uint8(AllocationType.OTHER), 0, _totalAllocated, 0, 0);
+      allocations[_beneficiary] = Allocation(uint8(AllocationType.OTHER), now, now, 0 days, _totalAllocated, 0, 0, false, false);
     }
 
     // Update the total available supply
@@ -123,16 +124,126 @@ contract TeamDistribution is Ownable {
   }
 
 
+
+  function release(address _beneficiary) public {
+    require(startTime <= now);
+    require(allocations[_beneficiary].balance > 0);
+
+    Allocation memory allocation = allocations[_beneficiary];
+    uint256 totalAmountVested = calculateTotalAmountVested(_beneficiary, allocation.startTimestamp, allocation.endTimestamp, allocation.initialAmount);
+    uint256 amountWithdrawable = totalAmountVested.sub(allocation.amountClaimed);
+    uint256 releasable = withdrawalAllowed(amountWithdrawable,  allocation.startTimestamp, allocation.endTimestamp, allocation.lockPeriod, allocation.initialAmount);
+
+    if(releasable > 0) {
+      token.safeTransfer(_beneficiary, releasable);
+
+      allocations[_beneficiary].amountClaimed = allocation.amountClaimed.add(releasable);
+      allocations[_beneficiary].balance = allocation.balance.sub(releasable);
+
+      emit Released(_beneficiary, releasable);
+    }
+  }
+
+
   function revokeAllocation (address _beneficiary) onlyOwner public {
-    require(ownerAddressToVestingContractAddress[_beneficiary] != address(0));
+    Allocation memory allocation = allocations[_beneficiary];
 
-    address vestingContractAddress = ownerAddressToVestingContractAddress[_beneficiary];
-    //Allocation storage revokedAllocation = allocations[_beneficiary];
-    MonthlyTokenVesting monthlyVesting = MonthlyTokenVesting(vestingContractAddress);
+    require(allocation.revocable == true);
 
-    monthlyVesting.revoke();
+    uint256 balance = token.balanceOf(_beneficiary);
+    uint256 totalAmountVested = calculateTotalAmountVested(_beneficiary, allocation.startTimestamp, allocation.endTimestamp, allocation.initialAmount);
+    uint256 amountWithdrawable = totalAmountVested.sub(allocation.amountClaimed);
 
+    uint256 refundable = withdrawalAllowed(amountWithdrawable,  allocation.startTimestamp, allocation.endTimestamp, allocation.lockPeriod, allocation.initialAmount);
+    emit LogUint('balance', balance);
+    emit LogUint('refundable', refundable);
+
+
+    uint256 backToProjectWallet = allocation.balance.sub(refundable);
+    emit LogUint('backToProjectWallet', backToProjectWallet);
+
+    if(refundable > 0) {
+      token.safeTransfer(_beneficiary, refundable);
+
+      allocations[_beneficiary].amountClaimed = allocation.amountClaimed.add(refundable);
+      allocations[_beneficiary].balance = 0;
+
+      emit Released(_beneficiary, refundable);
+    }
+
+    AVAILABLE_OTHER_SUPPLY = AVAILABLE_OTHER_SUPPLY.add(backToProjectWallet);
     emit RevokedAllocation(_beneficiary);
+  }
+
+  function getAllocationData (address _beneficiary) public view returns (
+    uint8 _AllocationSupply,
+    uint256 _startTimestamp,
+    uint256 _endTimestamp,
+    uint256 _lockPeriod,
+    uint256 _initialAmount,
+    uint256 _amountClaimed,
+    bool _revocable,
+    bool _revoked
+  ){
+    Allocation storage allocationData = allocations[_beneficiary];
+
+    return (
+        allocationData.AllocationSupply,
+        allocationData.startTimestamp,
+        allocationData.endTimestamp,
+        allocationData.lockPeriod,
+        allocationData.initialAmount,
+        allocationData.amountClaimed,
+        allocationData.revocable,
+        allocationData.revoked
+    );
+  }
+
+  /**
+ * @notice Calculates the total amount vested since the start time. If after the endTime
+ * the entire balance is returned
+ */
+
+  function calculateTotalAmountVested(address _beneficiary, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _initialAmount) internal view returns (uint256 _amountVested) {
+    // If it's past the end time, the whole amount is available.
+    if (now >= _endTimestamp) {
+      return allocations[_beneficiary].balance;
+    }
+
+    // get the amount of time that passed since the start of vesting
+    uint256 durationSinceStart = SafeMath.sub(now, _startTimestamp);
+    // Get the amount of time amount of time the vesting will happen over
+    uint256 totalVestingTime = SafeMath.sub(_endTimestamp, _startTimestamp);
+    // Calculate the amount vested as a ratio
+    uint256 vestedAmount = SafeMath.div(
+      SafeMath.mul(durationSinceStart, _initialAmount),
+      totalVestingTime
+    );
+
+    return vestedAmount;
+  }
+
+  /**
+ * @notice Calculates the amount releasable. If the amount is less than the allowable amount
+ * for each lock period zero will be returned. If more than the allowable amount each month will return
+ * a multiple of the allowable amount each month
+ */
+
+  function withdrawalAllowed(uint256 _amountWithdrawable, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount) internal view returns(uint256) {
+    // calculate the number of time periods vesting is done over
+    uint256 lockPeriods = (_endTimestamp.sub(_startTimestamp)).div(_lockPeriod);
+    uint256 amountWithdrawablePerLockPeriod = SafeMath.div(_initialAmount, lockPeriods);
+
+    // get the remainder and subtract it from the amount amount withdrawable to get a multiple of the
+    // amount withdrawable per lock period
+    uint256 remainder = SafeMath.mod(_amountWithdrawable, amountWithdrawablePerLockPeriod);
+    uint256 amountReleasable = _amountWithdrawable.sub(remainder);
+
+    if (now < _endTimestamp && amountReleasable >= amountWithdrawablePerLockPeriod) {
+      return amountReleasable;
+    }
+
+    return 0;
   }
 
   // Returns the amount of LIGHTSTREAM allocated

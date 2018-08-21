@@ -120,6 +120,22 @@ contract Crowdsale {
     _postValidatePurchase(_beneficiary, weiAmount);
   }
 
+  function updateRate(uint256 _newRate) {
+    uint256 lowestRate = SafeMath.div(
+      SafeMath.mul(rate, 9),
+      10
+    );
+
+    uint256 highestRate = SafeMath.div(
+      SafeMath.mul(rate, 11),
+      10
+    );
+
+    require(_newRate >= lowestRate && _newRate <= highestRate);
+
+    rate = _newRate;
+  }
+
   // -----------------------------------------
   // Internal interface (extensible)
   // -----------------------------------------
