@@ -2,6 +2,7 @@ pragma solidity ^0.4.24;
 
 import "./crowdsale/TokenCappedCrowdsale.sol";
 import "./distribution/FinalizableCrowdsale.sol";
+import "./distribution/MonthyVestingWithBonus.sol";
 import "./crowdsale/MintedCrowdsale.sol";
 import "./crowdsale/TimedCrowdsale.sol";
 import "./crowdsale/WhitelistedCrowdsale.sol";
@@ -27,29 +28,29 @@ contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, MintedCro
   // =============================
   uint8 public constant decimals = 18;
   uint256 public constant decimalFactor = 10 ** uint256(decimals);
-  uint256 public constant totalSupply = 1000000000 * decimalFactor;
-  uint256 public maxTokens =          3000000000 * decimalFactor; // There will be total 300 million PTH Tokens
-  uint256 public tokensForTeam =      135000000 * decimalFactor; // 45 percent will be reserved for the team
-  uint256 public tokensForSale = 165000000 * decimalFactor; // 65 percent will be sold in Crowdsale
-  uint256 public initalRate =          2733 * decimalFactor; // in Eth if Eth = 410 USD for this 2733000000000000000000 PHT = 1 Eth
+  uint256 public maxTokens =           300000000 * decimalFactor; // There will be total 300 million PTH Tokens
+  uint256 public tokensForTeam =       135000000 * decimalFactor; // 45 percent will be reserved for the team
+  uint256 public tokensForSale =       165000000 * decimalFactor; // 65 percent will be sold in Crowdsale
+  uint256 public initalRate =               2733; // in Eth if Eth = 410 USD for this 2733 PHT = 1 Eth
   address public distributionContract;
+  address public token;
 
   constructor(
     uint256 _openingTime, // Timestamp in epoch format (online calculator: https://www.unixtimestamp.com/index.php)
     uint256 _closingTime,
-    uint256 _rate,  // in Eth if Eth = 410 USD for this 2733000000000000000000 PHT = 1 Eth
     address _wallet,  // address of the wallet that receives funds
-    uint256 _cap, // Max cap in Eth if Eth = 410 USD for this 48780 Eth = 20 million
     LightstreamToken _token, // address of deployed token contract
     address _distributionContract
   )
   public
-  Crowdsale(initalRate, _wallet, _token)
+  Crowdsale(initalRate, _wallet, _token, _openingTime)
   TimedCrowdsale(_openingTime, _closingTime)
   TokenCappedCrowdsale(tokensForSale)
+  MonthlyVestingWithBonus(_token)
   WhitelistedCrowdsale()
   FinalizableCrowdsale() {
     distributionContract = _distributionContract;
+    token = _token;
   }
 
   function finalization() internal {

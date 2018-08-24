@@ -5,6 +5,8 @@ import "../token/MintableToken.sol";
 import "../utils/SafeMath.sol";
 import "../token/SafeERC20.sol";
 import "../distribution/MonthlyTokenVesting.sol";
+import "../utils/Ownable.sol";
+import "../distribution/MonthyVestingWithBonus.sol";
 
 
 /**
@@ -19,7 +21,7 @@ import "../distribution/MonthlyTokenVesting.sol";
  * the methods to add functionality. Consider using 'super' where appropriate to concatenate
  * behavior.
  */
-contract Crowdsale {
+contract Crowdsale is Ownable, MonthlyVestingWithBonus {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
@@ -34,8 +36,10 @@ contract Crowdsale {
   // So, if you are using a rate of 1 with a DetailedERC20 token with 3 decimals called TOK
   // 1 wei will give you 1 unit, or 0.001 TOK.
   uint256 public rate;
-  mapping (address => address) public ownerAddressToVestingContractAddress;
-  address[] private vestingContracts;
+  uint256 public openingTime;
+
+  mapping (address => uint256) public bonuses;
+
 
   // Amount of wei raised
   uint256 public weiRaised;
@@ -52,8 +56,19 @@ contract Crowdsale {
     address indexed purchaser,
     address indexed beneficiary,
     uint256 value,
-    uint256 amount,
-    address vestingContractAddress
+    uint256 amount
+  );
+
+  /**
+   * Event for tokens minted by the owner for contributors in private sale
+   * @param beneficiary Address of investor tokens minted and vested for
+   * @param tokens number of PTH to be minted 1 PTH = 1000000000000000000
+   * @param bonus number of PTH to be minted and given as bonus
+   */
+  event TokensMintedAndVested(
+    address beneficiary,
+    uint256 tokens,
+    uint256 bonus
   );
 
   event LogAddress(string _type, address _address);
@@ -64,7 +79,7 @@ contract Crowdsale {
    * @param _wallet Address where collected funds will be forwarded to
    * @param _token Address of the token being sold
    */
-  constructor(uint256 _rate, address _wallet, MintableToken _token) public {
+  constructor(uint256 _rate, address _wallet, MintableToken _token, uint256 _openingTime) public {
     require(_rate > 0);
     require(_wallet != address(0));
     require(_token != address(0));
@@ -72,6 +87,8 @@ contract Crowdsale {
     rate = _rate;
     wallet = _wallet;
     token = _token;
+    vestedToken = _token;
+    openingTime  = _openingTime;
   }
 
   // -----------------------------------------
@@ -85,42 +102,69 @@ contract Crowdsale {
     buyTokens(msg.sender);
   }
 
+  function returnNow() public returns(uint256) {
+    return now;
+  }
+
   /**
    * @dev low level token purchase ***DO NOT OVERRIDE***
    * @param _beneficiary Address performing the token purchase
    */
   function buyTokens(address _beneficiary) public payable {
-    emit LogAddress('_beneficiary', _beneficiary);
-
     uint256 weiAmount = msg.value;
-    emit LogInt('weiAmount', weiAmount);
 
     _preValidatePurchase(_beneficiary, weiAmount);
 
     // calculate token amount to be created
     uint256 tokens = _getTokenAmount(weiAmount);
+    uint256 bonus =  _getBonus(tokens);
 
     // update state
     weiRaised = weiRaised.add(weiAmount);
-    tokensSold = tokensSold.add(tokens);
+    tokensSold = tokensSold.add(tokens).add(bonus);
 
-    address vestingContractAddress = _processPurchase(_beneficiary, tokens);
+    _processPurchase(_beneficiary, tokens, bonus);
 
     emit TokenPurchase(
       msg.sender,
       _beneficiary,
       weiAmount,
-      tokens,
-      vestingContractAddress
+      tokens
     );
 
-    _updatePurchasingState(_beneficiary, weiAmount, vestingContractAddress);
+    _updatePurchasingState(_beneficiary, weiAmount);
 
     _forwardFunds();
     _postValidatePurchase(_beneficiary, weiAmount);
   }
 
-  function updateRate(uint256 _newRate) {
+  /**
+ * @dev low level token purchase ***DO NOT OVERRIDE***
+ * @param _beneficiary Address minting the tokens for
+ * @param _tokens number fo PTH to be minted 1 PTH = 1000000000000000000
+ * @param _bonus number fo PTH to be minted 1 PTH = 1000000000000000000
+ */
+  function mintAndVest(address _beneficiary, uint256 _tokens, uint256 _bonus) public onlyOwner {
+    _preValidateMintAndVest(_beneficiary, _tokens, _bonus);
+
+    // update state
+    tokensSold = tokensSold.add(_tokens).add(_bonus);
+
+    _processPurchase(_beneficiary, _tokens, _bonus);
+
+    emit TokensMintedAndVested(
+      _beneficiary,
+      _tokens,
+      _bonus
+    );
+  }
+
+  /**
+   * @dev updates the number of PTH given per wei. It will not allow a change over 10 percent of the current rate
+   * @param _newRate number of PTH given per wei
+   */
+
+  function updateRate(uint256 _newRate) public onlyOwner {
     uint256 lowestRate = SafeMath.div(
       SafeMath.mul(rate, 9),
       10
@@ -134,6 +178,26 @@ contract Crowdsale {
     require(_newRate >= lowestRate && _newRate <= highestRate);
 
     rate = _newRate;
+  }
+
+  /**
+   * @dev sets the bonus rate for the address
+   * @param _address number of PTH given per wei
+   * @param _bonus an integer with from 1 to 10000.
+   * 1 =        .01 percent bonus
+   * 10 =       .10 percent bonus
+   * 100 =     1.00 percent bonus
+   * 1000 =   10.00 percent bonus
+   * 10000 = 100.00 percent bonus
+   */
+
+  function setBonus(address _address, uint256 _bonus) public onlyOwner {
+    require(_bonus >= 1500 && _bonus <= 4000);
+    bonuses[_address] = _bonus;
+  }
+
+  function getBonus(address _address) public onlyOwner returns(uint256 _bonus){
+    return bonuses[_address];
   }
 
   // -----------------------------------------
@@ -159,6 +223,24 @@ contract Crowdsale {
   }
 
   /**
+   * @dev Validation of an incoming minting  and vesting by the owner
+   * @param _beneficiary Address of the investor/contributor tokens are being minted for
+   * @param _tokens Number of tokens to purchased in smallest unit of PHT 18 decimals
+   * @param _bonus Number of tokens allocated to the investor for contributing
+   */
+  function _preValidateMintAndVest(
+    address _beneficiary,
+    uint256 _tokens,
+    uint256 _bonus
+  )
+  internal
+  {
+    require(_tokens >= 1000000000000000000 && _tokens <= 10000000000000000000000000);
+    require(_bonus >= 1000000000000000000 && _bonus <= 10000000000000000000000000);
+    require(_bonus <= _tokens);
+  }
+
+  /**
    * @dev Validation of an executed purchase. Observe state and use revert statements to undo rollback when valid conditions are not met.
    * @param _beneficiary Address performing the token purchase
    * @param _weiAmount Value in wei involved in the purchase
@@ -174,7 +256,6 @@ contract Crowdsale {
 
   /**
    * @dev Source of tokens. Override this method to modify the way in which the crowdsale ultimately gets and sends its tokens.
-   * @param _beneficiary Address performing the token purchase
    * @param _tokenAmount Number of tokens to be emitted
    */
   function _deliverTokens(
@@ -183,20 +264,20 @@ contract Crowdsale {
   )
     internal
   {
-    token.safeTransfer(_beneficiary, _tokenAmount);
+    token.safeTransfer(address(this), _tokenAmount);
   }
 
   /**
    * @dev Executed when a purchase has been validated and is ready to be executed. Not necessarily emits/sends tokens.
    * @param _beneficiary Address receiving the tokens
-   * @param _tokenAmount Number of tokens to be purchased
+   * @param _tokensPurchased Number of tokens to be purchased
+   * @param _bonus Number of tokens awarded as a bonus
    */
-  function _processPurchase(address _beneficiary, uint256 _tokenAmount) internal returns (address _vestingContractAddress){
-    // ERC20 _token, address _beneficiary, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _cliffTimestamp, uint256 _lockPeriod, uint256 _totalAmount, bool _revocable
-    address vestingContractAddress = new MonthlyTokenVesting(token, _beneficiary, 1535760000, 1551312000, 1535760000, 30 days, _tokenAmount, false);
-    _deliverTokens(vestingContractAddress, _tokenAmount);
+  function _processPurchase(address _beneficiary, uint256 _tokensPurchased, uint _bonus) internal {
+    uint256 totalTokens = _tokensPurchased.add(_bonus);
+    _deliverTokens(_beneficiary, totalTokens);
 
-    return vestingContractAddress;
+    setVestingSchedule(_beneficiary, _tokensPurchased, _bonus);
   }
 
   /**
@@ -206,13 +287,11 @@ contract Crowdsale {
    */
   function _updatePurchasingState(
     address _beneficiary,
-    uint256 _weiAmount,
-    address _vestingContractAddress
+    uint256 _weiAmount
   )
     internal
   {
-    ownerAddressToVestingContractAddress[_beneficiary] = _vestingContractAddress;
-    vestingContracts.push(_vestingContractAddress);
+    // optional override
   }
 
   /**
@@ -225,6 +304,33 @@ contract Crowdsale {
   {
     return _weiAmount.mul(rate);
   }
+
+
+  /**
+   * @dev Override to extend the way in which ether is converted to tokens.
+   * @return Number of tokens that the investor is entitled to based on bonus
+   */
+  function _getBonus(uint256 _tokens)
+    internal returns (uint256 _bonus)
+  {
+    uint256 bonus = 0;
+
+    if(now > openingTime && now < openingTime + 72 hours) {
+      bonus = SafeMath.div(
+        SafeMath.mul(_tokens, 20),
+        100
+      );
+    } else if (now > openingTime + 72 hours && now < openingTime +  10 days) {
+      bonus = SafeMath.div(
+        SafeMath.mul(_tokens, 10),
+        100
+      );
+    }
+
+    emit LogInt('bonus', bonus);
+    return bonus;
+  }
+
 
   /**
    * @dev Determines how ETH is stored/forwarded on purchases.

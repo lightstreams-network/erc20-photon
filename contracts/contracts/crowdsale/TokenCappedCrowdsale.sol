@@ -13,9 +13,11 @@ contract TokenCappedCrowdsale is Crowdsale {
 
   uint256 public tokenCap;
 
+  event LogUint(string _type, uint256 _tokensPurchasing);
+
   /**
    * @dev Constructor, takes maximum amount of tokens sold in the crowdsale
-   * @param _tokenCap Max amount of wei to be contributed
+   * @param _tokenCap Max amount of tokens to be sold
    */
   constructor(uint256 _tokenCap) public {
     require(_tokenCap > 0);
@@ -42,8 +44,8 @@ contract TokenCappedCrowdsale is Crowdsale {
   internal
   {
     super._preValidatePurchase(_beneficiary, _weiAmount);
-    //uint256 tokensPurchasing = super._getTokenAmount(_weiAmount);
-    //require(tokensSold.add(tokensPurchasing) <= tokenCap);
+    uint256 tokensPurchasing = super._getTokenAmount(_weiAmount);
+    require(tokensSold.add(tokensPurchasing) <= tokenCap);
   }
 
 }

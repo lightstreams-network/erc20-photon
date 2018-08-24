@@ -109,9 +109,9 @@ before(async ()=>{
   const etherInWei = web3.utils.toWei('1', 'ether');
   const bigNumber = web3.utils.toBN(etherInWei);
 
-  // Deploy Crowdsale Contract with constructor arguments Start Time, End Time, Ratio of PTH to ETH, Wallet for funds to be deposited, Max Cap in ETH, and Address of Lightingstream Token
+  // Deploy Crowdsale Contract with constructor arguments Start Time, End Time, Wallet for funds to be deposited, and Address of Lightingstream Token
     sampleCrowdsaleContract = await new web3.eth.Contract(lightstreamCrowdsaleAbi)
-      .deploy({ data: lightstreamCrowdsaleBytecode, arguments: [startTime.toString(), endTime.toString(), '1', walletAdress, bigNumber, lightstreamTokenAddress, distributionContractAddress]})
+      .deploy({ data: lightstreamCrowdsaleBytecode, arguments: [startTime.toString(), endTime.toString(), walletAdress, lightstreamTokenAddress, distributionContractAddress]})
       .send({ from: accounts[0], gas: '4712388' });
 
     // Transfer ownership to the crowdsale contract so only it can mint tokens
@@ -143,7 +143,8 @@ describe('The contacts are deployed', ()=> {
 describe('Tests the Whitelist.sol contract functionality', ()=> {
   // addAddressToWhitelist - addAddressToWhitelist(address)
   it('Allows the owner to add an address to the whitelist', async ()=> {
-    await sampleCrowdsaleContract.methods.addAddressToWhitelist(accounts[2]).send({ from: accounts[0], gas: '4712388' });
+    const addAddressToWhitelist = await sampleCrowdsaleContract.methods.addAddressToWhitelist(accounts[2]).send({ from: accounts[0], gas: '4712388' });
+    // printData('addAddressToWhitelist', addAddressToWhitelist);
   });
 
   // addAddressesToWhitelist(address[])
@@ -209,6 +210,7 @@ describe('Tests the TokenCappedCrowdsale.sol functionality', async ()=> {
 
 });
 
+
 /*
  * Tests retrieving the openingTime, closingTime, and hasClosed functions in the TimedCrowdsale.sol contract
  */
@@ -267,7 +269,7 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
   it('Returns the rate information', async ()=> {
     const rate = await sampleCrowdsaleContract.methods.rate().call();
 
-    assert.equal(2733000000000000000000, rate);
+    assert.equal(2733, rate);
   });
 
   // buyTokens(address)
@@ -280,16 +282,52 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
     const purchaseAmount = web3.utils.toBN(etherInWei);
 
     try {
-      await sampleCrowdsaleContract.methods.addAddressToWhitelist(accounts[1]).send({ from: accounts[0], gas: '4712388' });
+      await sampleCrowdsaleContract.methods.addAddressToWhitelist(accounts[1]).send({
+        from: accounts[0],
+        gas: '4712388'
+      });
 
       const isWhitelisted = await sampleCrowdsaleContract.methods.whitelist(accounts[1]).call();
       printData('isWhitelisted', isWhitelisted);
 
-      await sampleCrowdsaleContract.methods.buyTokens(accounts[1]).send({ from: accounts[1], value: purchaseAmount, gas: '4712388' });
+      const openingTime = await sampleCrowdsaleContract.methods.openingTime().call();
+      printData('openingTime', openingTime);
 
-    } catch(error){
-      printData('error', error);
+      const now = await sampleCrowdsaleContract.methods.returnNow().call();
+      printData('now', now);
+
+      const purchaseTransaction = await sampleCrowdsaleContract.methods.buyTokens(accounts[1]).send({
+        from: accounts[1],
+        value: purchaseAmount,
+        gas: '4712388'
+      });
+
+      printData('purchaseTransaction', purchaseTransaction.events);
+
+    } catch (error) {
+      printData('purchaseTransaction - error', error.results);
     }
+  });
+
+    // mintAndVest(address _beneficiary, uint256 _tokens, uint256 _bonus)
+  it('Allows the owner to mint tokens for pre-sale collected in USD', async ()=> {
+      // The amount needs to be an integer.  PTH has 18 decimals so it's the same as converting Eth to Wei
+      const pthInWei = web3.utils.toWei('6000000', 'ether');
+      const mintAmount = web3.utils.toBN(pthInWei);
+
+      const bonusInWei = web3.utils.toWei('100000', 'ether');
+      const bonusAmount = web3.utils.toBN(bonusInWei);
+
+      try {
+        await sampleCrowdsaleContract.methods.addAddressToWhitelist(accounts[2]).send({ from: accounts[0], gas: '4712388' });
+
+        const mintAndVest  = await sampleCrowdsaleContract.methods.mintAndVest(accounts[2], mintAmount, bonusAmount).send({ from: accounts[0], gas: '4712388' });
+
+        printData('mintAndVest', mintAndVest.events);
+
+      } catch(error){
+        printData('mintAndVest - error', error);
+      }
   });
 
   // weiRaised()
@@ -327,11 +365,9 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
 
   // updateRate(uint256)
   it('Will update the rate if it is within 10 percent of the initial rate', async ()=> {
-    const pthInWei = web3.utils.toWei('3000', 'ether');
-    const bigNumber = web3.utils.toBN(pthInWei);
 
     try{
-      await sampleCrowdsaleContract.methods.updateRate(bigNumber).send({ from: accounts[0], gas: '4712388' });
+      await sampleCrowdsaleContract.methods.updateRate('3000').send({ from: accounts[0], gas: '4712388' });
       const rate = await sampleCrowdsaleContract.methods.rate().call();
       printData('newRate', rate);
     } catch(error) {
@@ -340,7 +376,7 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
   });
 
   // ownerAddressToVestingContractAddress(address)
-  it("Returns the vesting contract address of the beneficiary", async ()=> {
+  it.skip("Returns the vesting contract address of the beneficiary", async ()=> {
     vestingContractAddress = await sampleCrowdsaleContract.methods.ownerAddressToVestingContractAddress(accounts[1]).call();
   });
 
@@ -351,7 +387,7 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
  * Tests retrieving the token, owner, wallet, rate, weiRaised, and buying of tokens in the Crowdsale.sol contract
  */
 
-describe("Test TokenVesting.sol functionality", async ()=> {
+describe.skip("Test TokenVesting.sol functionality", async ()=> {
   let releaseableAmount;
 
   before(async ()=> {
@@ -416,8 +452,17 @@ describe("Test TokenVesting.sol functionality", async ()=> {
 describe("Tests the distribution contract", async ()=> {
   let vestingContractAddress;
 
-  before(async()=>{
-    await sampleCrowdsaleContract.methods.finalize().send({ from: accounts[0], gas: '4712388' });
+  before(async()=> {
+    try {
+      // Travel three months into the future for testing
+      timeTravel(3600 * 24 * 30 * 3);
+
+      await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+      await sampleCrowdsaleContract.methods.finalize().send({ from: accounts[0], gas: '4712388' });
+    } catch(error){
+      printData('finalize -- error', error);
+    }
 
     await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
   });
@@ -474,7 +519,7 @@ describe("Tests the distribution contract", async ()=> {
     try {
       const revoke = await distributionContract.methods.revokeAllocation(accounts[5]).send({ from: accounts[0], gas: '4712388' });
 
-      printData('revoke', revoke.events.LogUint);
+      //printData('revoke', revoke.events.LogUint);
     } catch(error){
       printData('Error - revokeAllocation', error);
     }
@@ -492,7 +537,7 @@ describe("The investors's wallet", async ()=> {
   it("Has the right amount of the Lightstream token in it", async ()=> {
     const lightstreamBalance = await lightstreamTokenContract.methods.balanceOf(accounts[1]).call();
 
-    assert.equal(911000000000000000000000000000000000000, lightstreamBalance);
+    assert.equal(3279600000000000000000, lightstreamBalance);
   });
 });
 
@@ -528,6 +573,43 @@ describe("The project wallet", async ()=> {
   });
 });
 
+describe("Bonuses", async ()=> {
+  // setBonus(_address, _bonus)
+  it("Can set a bonus", async ()=> {
+    const setBonus = await sampleCrowdsaleContract.methods.setBonus(accounts[8], 3000).send({ from: accounts[0], gas: '4712388' });
+
+    printData('setBonus', setBonus);
+  });
+
+  it("Can get the bonus set for an address", async ()=> {
+    const setBonus = await sampleCrowdsaleContract.methods.getBonus(accounts[8]).call();
+
+    printData('setBonus', setBonus);
+  });
+
+  it("Contributor receives allocated bonus", async ()=> {
+    await sampleCrowdsaleContract.methods.addAddressToWhitelist(accounts[8]).send({ from: accounts[0], gas: '4712388' });
+
+    // convert ether to a Big Number so web3 doesn't complain
+    const etherInWei = web3.utils.toWei('1', 'ether');
+    const purchaseAmount = web3.utils.toBN(etherInWei);
+
+    const now = await sampleCrowdsaleContract.methods.returnNow().call();
+    printData('now', now);
+
+    const closingTime = await sampleCrowdsaleContract.methods.closingTime().call();
+    printData('closingTime', closingTime);
+  });
+});
+
+describe("Vesting", async ()=> {
+  // getVestingSchedule(_address)
+  it("Gets the vesting schedule for a ", async ()=> {
+    const getVestingSchedule = await sampleCrowdsaleContract.methods.getVestingSchedule(accounts[2]).call();
+
+    printData('getVestingSchedule', getVestingSchedule);
+  });
+});
 
 
 
