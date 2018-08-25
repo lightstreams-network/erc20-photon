@@ -1,12 +1,11 @@
 pragma solidity ^0.4.24;
 
 import "../token/ERC20.sol";
+import "../token/SafeERC20.sol";
 import "../token/MintableToken.sol";
 import "../utils/SafeMath.sol";
-import "../token/SafeERC20.sol";
-import "../distribution/MonthlyTokenVesting.sol";
 import "../utils/Ownable.sol";
-import "../distribution/MonthyVestingWithBonus.sol";
+import "../escrow/TokenEscrow.sol";
 
 
 /**
@@ -21,7 +20,8 @@ import "../distribution/MonthyVestingWithBonus.sol";
  * the methods to add functionality. Consider using 'super' where appropriate to concatenate
  * behavior.
  */
-contract Crowdsale is Ownable, MonthlyVestingWithBonus {
+
+contract Crowdsale is Ownable, TokenEscrow {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
@@ -87,7 +87,7 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus {
     rate = _rate;
     wallet = _wallet;
     token = _token;
-    vestedToken = _token;
+    //vestedToken = _token;
     openingTime  = _openingTime;
   }
 
@@ -151,6 +151,21 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus {
     tokensSold = tokensSold.add(_tokens).add(_bonus);
 
     _processPurchase(_beneficiary, _tokens, _bonus);
+
+    emit TokensMintedAndVested(
+      _beneficiary,
+      _tokens,
+      _bonus
+    );
+  }
+
+  function mintAndEscrow(address _beneficiary, uint256 _tokens, uint256 _bonus) public onlyOwner {
+    _preValidateMintAndVest(_beneficiary, _tokens, _bonus);
+
+    // update state
+    tokensSold = tokensSold.add(_tokens).add(_bonus);
+
+    _processEscrow(_beneficiary, _tokens, _bonus);
 
     emit TokensMintedAndVested(
       _beneficiary,
@@ -277,7 +292,15 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus {
     uint256 totalTokens = _tokensPurchased.add(_bonus);
     _deliverTokens(_beneficiary, totalTokens);
 
-    setVestingSchedule(_beneficiary, _tokensPurchased, _bonus);
+    //setVestingSchedule(_beneficiary, _tokensPurchased, _bonus);
+  }
+
+
+  function _processEscrow(address _beneficiary, uint256 _tokensPurchased, uint _bonus) internal {
+    uint256 totalTokens = _tokensPurchased.add(_bonus);
+    _deliverTokens(_beneficiary, totalTokens);
+
+    createEscrow(_beneficiary, _tokensPurchased, _bonus);
   }
 
   /**
@@ -337,5 +360,13 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus {
    */
   function _forwardFunds() internal {
     wallet.transfer(msg.value);
+  }
+
+  // Allow transfer of accidentally sent ERC20 tokens
+  function refundTokens(address _recipient, address _token) public onlyOwner {
+    require(_token != address(token));
+    ERC20 refundToken = ERC20(_token);
+    uint256 balance = refundToken.balanceOf(this);
+    require(refundToken.transfer(_recipient, balance));
   }
 }

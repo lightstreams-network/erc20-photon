@@ -1,10 +1,19 @@
 require('events').EventEmitter.prototype._maxListeners = 100;
-const assert = require('chai').assert;
-const ganche = require('ganache-cli');
-const Web3 = require('web3');
-const web3 = new Web3(ganche.provider());
+
 const path = require('path');
 const fs = require('fs');
+const assert = require('chai').assert;
+
+const ganche = require('ganache-cli');
+const HDWalletProvider = require('truffle-hdwallet-provider');
+const provider = new HDWalletProvider(
+  'inform alpha success reunion weasel tortoise ancient purchase average shoulder steel volcano',
+  'https://rinkeby.infura.io/v3/1b651419fc314be8aef2c04b85b2d250'
+);
+
+const Web3 = require('web3');
+//const web3 = new Web3(ganche.provider());
+const web3 = new Web3(provider);
 
 // Lightsteam Token Contract
 const lightstreamTokenPath = path.resolve(__dirname, '../contracts/build/contracts', 'LightstreamToken.json');
@@ -85,38 +94,58 @@ let walletAdress;
  * ownership of the token contract to the crowsale contract
  */
 
-before(async ()=>{
-  // get list of accounts provided by Ganche
+before(async function(done) {
+  this.timeout(60 * 1000 * 10);
+  // Get list of accounts provided by Ganche
   accounts = await web3.eth.getAccounts();
   walletAdress = accounts[9];
 
   // Deploy the Lightstream Token Contract
+  printData('lightstreamTokenContractBytecode', lightstreamTokenBytecode.length);
   lightstreamTokenContract = await new web3.eth.Contract(lightstreamTokenAbi)
     .deploy({ data: lightstreamTokenBytecode, arguments: []})
-    .send({ from: accounts[0], gas: '4712388' });
+    .send({ from: accounts[0], gas: '4712387' });
 
   // Get the address of the Lightstream Token
   lightstreamTokenAddress = lightstreamTokenContract.options.address;
 
+  printData('lightstreamTokenAddress', lightstreamTokenAddress);
+
   // Deploy the distribution Contract
+  printData('teamDistributionBytecode', teamDistributionBytecode.length);
   distributionContract = await new web3.eth.Contract(teamDistributionAbi)
     .deploy({ data: teamDistributionBytecode, arguments: [startTime.toString(), lightstreamTokenAddress]})
     .send({ from: accounts[0], gas: '4712388' });
 
   distributionContractAddress = distributionContract.options.address;
 
+  printData('distributionContractAddress', distributionContractAddress);
+
   // Convert 1 Ether to Wei and convert to Big Number format
   const etherInWei = web3.utils.toWei('1', 'ether');
   const bigNumber = web3.utils.toBN(etherInWei);
 
   // Deploy Crowdsale Contract with constructor arguments Start Time, End Time, Wallet for funds to be deposited, and Address of Lightingstream Token
+  try {
+    printData('lightstreamCrowdsaleBytecode', lightstreamCrowdsaleBytecode.length);
     sampleCrowdsaleContract = await new web3.eth.Contract(lightstreamCrowdsaleAbi)
       .deploy({ data: lightstreamCrowdsaleBytecode, arguments: [startTime.toString(), endTime.toString(), walletAdress, lightstreamTokenAddress, distributionContractAddress]})
-      .send({ from: accounts[0], gas: '4712388' });
+      .send({ from: accounts[0], gas: '6000000' });
+  }catch(error){
+    printData('sampleCrowdsaleContract - Deploy - error', error);
+  }
 
-    // Transfer ownership to the crowdsale contract so only it can mint tokens
-    await lightstreamTokenContract.methods.transferOwnership(sampleCrowdsaleContract.options.address).send({ from: accounts[0], gas: '4712388' });
+  printData('sampleCrowdsaleContract', sampleCrowdsaleContract.options.address);
+
+  // Transfer ownership to the crowdsale contract so only it can mint tokens
+  await lightstreamTokenContract.methods.transferOwnership(sampleCrowdsaleContract.options.address).send({ from: accounts[0], gas: '4712388' });
+
+  done();
 });
+
+// 12664 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit. - Rinkeby
+// 12074 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit. - Rinkeby
+// didn't log, 4712388 gas, VM Exception while processing transaction: out of gas - Ganache
 
 /*
  * Tests to that the Lightstream Token and Whitelisted Crowdsale Contracts were deployed and have an address
@@ -608,6 +637,37 @@ describe("Vesting", async ()=> {
     const getVestingSchedule = await sampleCrowdsaleContract.methods.getVestingSchedule(accounts[2]).call();
 
     printData('getVestingSchedule', getVestingSchedule);
+  });
+});
+
+
+describe("Escrow", async ()=> {
+  // mintAndEscrow(_address)
+  it("Creates an escrow for a contributor", async ()=> {
+    // The amount needs to be an integer.  PTH has 18 decimals so it's the same as converting Eth to Wei
+    const pthInWei = web3.utils.toWei('6000000', 'ether');
+    const mintAmount = web3.utils.toBN(pthInWei);
+
+    const bonusInWei = web3.utils.toWei('100000', 'ether');
+    const bonusAmount = web3.utils.toBN(bonusInWei);
+
+    const mintAndEscrow = await sampleCrowdsaleContract.methods.mintAndEscrow(accounts[7], mintAmount, bonusAmount).send({ from: accounts[0], gas: '4712388' });
+
+    printData('mintAndEscrow', mintAndEscrow);
+  });
+
+  // getEscrowData(address)
+  it("Returns the data of an escrow for a user", async ()=> {
+    const getEscrowData = await sampleCrowdsaleContract.methods.getEscrowData(accounts[7]).call();
+
+    printData('getEscrowData', getEscrowData);
+  });
+
+  // refund(address)
+  it("Refunds the contributor", async ()=> {
+    const refund = await sampleCrowdsaleContract.methods.refund(accounts[7]).send({ from: accounts[0], gas: '4712388' });
+
+    printData('refund', refund);
   });
 });
 

@@ -2,7 +2,8 @@ pragma solidity ^0.4.24;
 
 import "./crowdsale/TokenCappedCrowdsale.sol";
 import "./distribution/FinalizableCrowdsale.sol";
-import "./distribution/MonthyVestingWithBonus.sol";
+import "./distribution/MonthlyVestingWithBonus.sol";
+import "./escrow/TokenEscrow.sol";
 import "./crowdsale/MintedCrowdsale.sol";
 import "./crowdsale/TimedCrowdsale.sol";
 import "./crowdsale/WhitelistedCrowdsale.sol";
@@ -47,6 +48,7 @@ contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, MintedCro
   TimedCrowdsale(_openingTime, _closingTime)
   TokenCappedCrowdsale(tokensForSale)
   MonthlyVestingWithBonus(_token)
+  TokenEscrow(_token, _wallet)
   WhitelistedCrowdsale()
   FinalizableCrowdsale() {
     distributionContract = _distributionContract;
