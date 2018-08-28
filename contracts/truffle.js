@@ -21,3 +21,22 @@
 //     gas: 4612388 // Gas limit used for deploys
 //   }
 // };
+var PrivateKeyProvider = require('truffle-privatekey-provider');
+
+module.exports = {
+  networks: {
+    development: {
+      host: 'localhost',
+      port: 9545,
+      network_id: '*'
+    },
+    rinkeby: {
+      provider: function() {
+        // 4868546F8FDE76879690130D4FAAD3E8B043A0C79528BC04D5E15F9B4FD54FCD
+        return new PrivateKeyProvider('4868546F8FDE76879690130D4FAAD3E8B043A0C79528BC04D5E15F9B4FD54FCD', 'https://rinkeby.infura.io/Yqe59oKMsdh4CnwHxAyE')
+      },
+      network_id: 4,
+      gas: 6000000
+    },
+  }
+};
