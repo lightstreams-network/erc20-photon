@@ -38,7 +38,7 @@ contract TokenEscrow is Ownable, MonthlyVestingWithBonus {
   }
 
 
-  function getEscrowData(address _contributor) public onlyOwner
+  function getEscrowData(address _contributor) public view onlyOwner
     returns(
       address contributor,
       uint256 purchaseAmount,
@@ -56,7 +56,7 @@ contract TokenEscrow is Ownable, MonthlyVestingWithBonus {
     );
   }
 
-  function refund(address _contributor) onlyOwner {
+  function refund(address _contributor) public onlyOwner {
     Escrow storage escrow = escrows[_contributor];
     uint256 transferAmount = escrow.purchaseAmount.add(escrow.bonusAmount);
 
@@ -64,7 +64,7 @@ contract TokenEscrow is Ownable, MonthlyVestingWithBonus {
     emit EscrowCompletion(_contributor, transferAmount, EscrowStatus.Refunded);
   }
 
-  function completeAndVest(address _contributor) onlyOwner {
+  function completeAndVest(address _contributor) public onlyOwner {
     Escrow storage escrow = escrows[_contributor];
     uint256 transferAmount = escrow.purchaseAmount.add(escrow.bonusAmount);
 

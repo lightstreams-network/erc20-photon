@@ -21,6 +21,7 @@ const lightstreamTokenJSON = fs.readFileSync(lightstreamTokenPath, 'utf8');
 const { abi: lightstreamTokenAbi, bytecode: lightstreamTokenBytecode } = JSON.parse(lightstreamTokenJSON);
 
 // Sample Crowdsale Contract
+// OpenZepplinSampleSale.sol  LightstreamCrowdsale
 const lightstreamCrowdsalePath = path.resolve(__dirname, '../contracts/build/contracts', 'LightstreamCrowdsale.json');
 const lightstreamCrowdsaleJSON = fs.readFileSync(lightstreamCrowdsalePath, 'utf8');
 const { abi: lightstreamCrowdsaleAbi, bytecode: lightstreamCrowdsaleBytecode } = JSON.parse(lightstreamCrowdsaleJSON);
@@ -93,12 +94,15 @@ let walletAdress;
  * Before running tests deploy the token contract, deploy the crowdsale contract, and then tranfer
  * ownership of the token contract to the crowsale contract
  */
-
+//function(done)
 before(async function(done) {
   this.timeout(60 * 1000 * 10);
   // Get list of accounts provided by Ganche
   accounts = await web3.eth.getAccounts();
   walletAdress = accounts[9];
+  printData('lightstreamTokenContractBytecode', lightstreamTokenBytecode.length);
+  printData('teamDistributionBytecode', teamDistributionBytecode.length);
+  printData('lightstreamCrowdsaleBytecode', lightstreamCrowdsaleBytecode);
 
   // Deploy the Lightstream Token Contract
   printData('lightstreamTokenContractBytecode', lightstreamTokenBytecode.length);
@@ -122,14 +126,28 @@ before(async function(done) {
   printData('distributionContractAddress', distributionContractAddress);
 
   // Convert 1 Ether to Wei and convert to Big Number format
-  const etherInWei = web3.utils.toWei('1', 'ether');
-  const bigNumber = web3.utils.toBN(etherInWei);
+  const etherInWei = web3.utils.toWei('86200', 'ether');
+  const cap = web3.utils.toBN(etherInWei);
 
   // Deploy Crowdsale Contract with constructor arguments Start Time, End Time, Wallet for funds to be deposited, and Address of Lightingstream Token
   try {
-    printData('lightstreamCrowdsaleBytecode', lightstreamCrowdsaleBytecode.length);
+     printData('lightstreamCrowdsaleBytecode', lightstreamCrowdsaleBytecode);
     sampleCrowdsaleContract = await new web3.eth.Contract(lightstreamCrowdsaleAbi)
       .deploy({ data: lightstreamCrowdsaleBytecode, arguments: [startTime.toString(), endTime.toString(), walletAdress, lightstreamTokenAddress, distributionContractAddress]})
+      .send({ from: accounts[0], gas: '4712388', gasLimit: '10000000' });
+
+      // uint256 _openingTime,
+      // uint256 _closingTime,
+      // uint256 _rate,
+      // address _wallet,
+      // uint256 _cap,
+      // MintableToken _token,
+      // uint256 _goal
+
+    //_rate, _wallet, _token
+    // startTime.toString(), endTime.toString(), 2733, walletAdress, cap, lightstreamTokenAddress, cap
+    sampleCrowdsaleContract = await new web3.eth.Contract(lightstreamCrowdsaleAbi)
+      .deploy({ data: lightstreamCrowdsaleBytecode, arguments: [startTime.toString(), endTime.toString(), 2733, walletAdress, cap, lightstreamTokenAddress, cap]})
       .send({ from: accounts[0], gas: '6000000' });
   }catch(error){
     printData('sampleCrowdsaleContract - Deploy - error', error);
@@ -143,9 +161,20 @@ before(async function(done) {
   done();
 });
 
-// 12664 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit. - Rinkeby
-// 12074 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit. - Rinkeby
-// didn't log, 4712388 gas, VM Exception while processing transaction: out of gas - Ganache
+// 12664 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+// 34238 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+// 12074 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+// 21048 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+// 17462 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+// 17462 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+//  7888 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+//  3676 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+//  3646 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
+//  3646 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby - Didn't work when using contract to inherit crowdsale contract and initialize in constructor
+//  3220 - bytecode length,  4712388 gas, Worked when only deploying base contract and commenting out - require(_rate > 0); require(_wallet != address(0)); require(_token != address(0));
+//  3886 - bytecode length,  4712388 gas, Worked when using TimedContract in constructor and commenting out - require(_rate > 0); require(_wallet != address(0)); require(_token != address(0));
+//  4302 - bytecode length,  4712388 gas, Didn't work when using TimedContract, CappedCrowdsale and RefundableCrowdsale in constructor and commenting out - require(_rate > 0); require(_wallet != address(0)); require(_token != address(0));
+//              didn't log,  4712388 gas, - Error:VM Exception while processing transaction: out of gas              , - Ganache
 
 /*
  * Tests to that the Lightstream Token and Whitelisted Crowdsale Contracts were deployed and have an address
