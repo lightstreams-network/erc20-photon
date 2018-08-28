@@ -47,14 +47,13 @@ contract LightstreamCrowdsale is Crowdsale {
     address _distributionContract
   )
   public
-  Crowdsale(initialRate, _wallet, _token)
-  //TimedCrowdsale(_openingTime, _closingTime)
-  //TokenCappedCrowdsale(tokensForSale)
-  //MonthlyVestingWithBonus(_token)
-  //TokenEscrow(_token, _wallet)
-  //WhitelistedCrowdsale()
-  //FinalizableCrowdsale()
-  {
+  Crowdsale(initialRate, _wallet, _token, _openingTime)
+  TimedCrowdsale(_openingTime, _closingTime)
+  TokenCappedCrowdsale(tokensForSale)
+  MonthlyVestingWithBonus(_token)
+  TokenEscrow(_token, _wallet)
+  WhitelistedCrowdsale()
+  FinalizableCrowdsale() {
     distributionContract = _distributionContract;
     token = _token;
   }
