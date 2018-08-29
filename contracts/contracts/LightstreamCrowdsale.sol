@@ -8,6 +8,7 @@ import "./crowdsale/MintedCrowdsale.sol";
 import "./crowdsale/TimedCrowdsale.sol";
 import "./crowdsale/WhitelistedCrowdsale.sol";
 import "./LightstreamToken.sol";
+import "./token/MintableToken.sol";
 
 
 /**
@@ -22,11 +23,9 @@ import "./LightstreamToken.sol";
  * After adding multiple features it's good practice to run integration tests
  * to ensure that subcontracts works together as intended.
  */
-// TimedCrowdsale, TokenCappedCrowdsale, MintedCrowdsale, WhitelistedCrowdsale, FinalizableCrowdsale
 
 
-
-contract LightstreamCrowdsale is Crowdsale {
+contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, MintedCrowdsale, WhitelistedCrowdsale, FinalizableCrowdsale {
 
   // Token Distribution
   // =============================
@@ -38,6 +37,8 @@ contract LightstreamCrowdsale is Crowdsale {
   uint256 public initialRate =               2733; // in Eth if Eth = 410 USD for this 2733 PHT = 1 Eth
   address public distributionContract;
   address public token;
+
+  event LogString(string _string);
 
   constructor(
     uint256 _openingTime, // Timestamp in epoch format (online calculator: https://www.unixtimestamp.com/index.php)
@@ -61,7 +62,7 @@ contract LightstreamCrowdsale is Crowdsale {
   function finalization() internal {
     // emit tokens for the foundation
     MintableToken(token).mint(distributionContract, tokensForTeam);
-
+    emit LogString('finalization');
     // NOTE: cannot call super here because it would finish minting and
     // the continuous sale would not be able to proceed
   }

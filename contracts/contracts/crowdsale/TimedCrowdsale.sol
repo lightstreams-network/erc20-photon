@@ -1,14 +1,14 @@
 pragma solidity ^0.4.24;
 
 import "../utils/SafeMath.sol";
-import "./OriginalCrowdsale.sol";
+import "./Crowdsale.sol";
 
 
 /**
  * @title TimedCrowdsale
  * @dev Crowdsale accepting contributions only within a time frame.
  */
-contract TimedCrowdsale is OriginalCrowdsale {
+contract TimedCrowdsale is Crowdsale {
   using SafeMath for uint256;
 
   uint256 public openingTime;

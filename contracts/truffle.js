@@ -12,14 +12,15 @@
  *   },
  */
 
-var PrivateKeyProvider = require('truffle-privatekey-provider');
+const PrivateKeyProvider = require('truffle-privatekey-provider');
 
 module.exports = {
   networks: {
     development: {
       host: 'localhost',
-      port: 9545,
-      network_id: '*'
+      port: 8545,
+      network_id: '*',
+      gas: 6000000
     },
     rinkeby: {
       provider: function() {
@@ -29,5 +30,11 @@ module.exports = {
       network_id: 4,
       gas: 6000000
     },
+  },
+  solc: {
+    optimizer: {
+      enable: true,
+      runs: 200
+    }
   }
 };
