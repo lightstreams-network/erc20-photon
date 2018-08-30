@@ -94,30 +94,47 @@ contract TeamDistribution is Ownable {
     Allocation memory allocation = allocations[_beneficiary];
     //prevent an allocation from being written over
     require(allocation.startTimestamp == 0);
-
+    // TEAM
     if (_supply == AllocationType.TEAM) {
+      require(_totalAllocated <= AVAILABLE_TEAM_SUPPLY);
+
       AVAILABLE_TEAM_SUPPLY = AVAILABLE_TEAM_SUPPLY.sub(_totalAllocated);
 
       allocations[_beneficiary] = Allocation(uint8(AllocationType.TEAM), now, now + 720 days, 30 days, _totalAllocated, 0, _totalAllocated, true, false);
+    // SEED_INVESTORS
     } else if (_supply == AllocationType.SEED_INVESTORS) {
+      require(_totalAllocated <= AVAILABLE_SEED_INVESTORS_SUPPLY);
+
       AVAILABLE_SEED_INVESTORS_SUPPLY = AVAILABLE_SEED_INVESTORS_SUPPLY.sub(_totalAllocated);
 
       allocations[_beneficiary] = Allocation(uint8(AllocationType.SEED_INVESTORS), now, now + 150 days, 30 days, _totalAllocated, 0, _totalAllocated, true, false);
+    // FOUNDERS
     } else if (_supply == AllocationType.FOUNDERS) {
+      require(_totalAllocated <= AVAILABLE_FOUNDERS_SUPPLY);
+
       AVAILABLE_FOUNDERS_SUPPLY = AVAILABLE_FOUNDERS_SUPPLY.sub(_totalAllocated);
 
       allocations[_beneficiary] = Allocation(uint8(AllocationType.FOUNDERS), now, now + 720 days, 30 days, _totalAllocated, 0, _totalAllocated, true, false);
+    // ADVISORS
     } else if (_supply == AllocationType.ADVISORS) {
+      require(_totalAllocated <= AVAILABLE_ADVISORS_SUPPLY);
+
       AVAILABLE_ADVISORS_SUPPLY = AVAILABLE_ADVISORS_SUPPLY.sub(_totalAllocated);
 
       token.safeTransfer(_beneficiary, _totalAllocated);
       allocations[_beneficiary] = Allocation(uint8(AllocationType.ADVISORS),now, now, 0 days, _totalAllocated, 0, 0, false, false);
+     // CONSULTANTS
     } else if (_supply == AllocationType.CONSULTANTS) {
+      require(_totalAllocated <= AVAILABLE_CONSULTANTS_SUPPLY);
+
       AVAILABLE_CONSULTANTS_SUPPLY = AVAILABLE_CONSULTANTS_SUPPLY.sub(_totalAllocated);
 
       token.safeTransfer(_beneficiary, _totalAllocated);
       allocations[_beneficiary] = Allocation(uint8(AllocationType.CONSULTANTS),now, now, 0 days, _totalAllocated, 0, 0, false, false);
+    // OTHER
     } else if (_supply == AllocationType.OTHER) {
+      require(_totalAllocated <= AVAILABLE_OTHER_SUPPLY);
+
       AVAILABLE_OTHER_SUPPLY = AVAILABLE_OTHER_SUPPLY.sub(_totalAllocated);
 
       token.safeTransfer(_beneficiary, _totalAllocated);
@@ -225,6 +242,8 @@ contract TeamDistribution is Ownable {
 
     if (now < _endTimestamp && amountReleasable >= amountWithdrawablePerLockPeriod) {
       return amountReleasable;
+    } else if (now > _endTimestamp) {
+      return _amountWithdrawable;
     }
 
     return 0;
