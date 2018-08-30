@@ -23,7 +23,7 @@ contract FinalizableCrowdsale is Ownable, TimedCrowdsale {
    */
   function finalize() public onlyOwner {
     require(!isFinalized);
-    require(hasClosed());
+    require(hasClosed(), 'Has closed()');
 
     finalization();
     emit Finalized();

@@ -75,6 +75,10 @@ contract TeamDistribution is Ownable {
     token = _lightstream;
   }
 
+  function returnNow() public returns(uint){
+    return now;
+  }
+
   /**
     * @dev Allow the owner of the contract to assign a new allocation
     * @param _beneficiary The recipient of the allocation
@@ -87,6 +91,9 @@ contract TeamDistribution is Ownable {
     require(_totalAllocated > 0);
     // check to make sure the address exists so tokens don't get burnt
     require(_beneficiary != address(0));
+    Allocation memory allocation = allocations[_beneficiary];
+    //prevent an allocation from being written over
+    require(allocation.startTimestamp == 0);
 
     if (_supply == AllocationType.TEAM) {
       AVAILABLE_TEAM_SUPPLY = AVAILABLE_TEAM_SUPPLY.sub(_totalAllocated);
@@ -128,6 +135,7 @@ contract TeamDistribution is Ownable {
   function release(address _beneficiary) public {
     require(startTime <= now);
     require(allocations[_beneficiary].balance > 0);
+    require(msg.sender == _beneficiary);
 
     Allocation memory allocation = allocations[_beneficiary];
     uint256 totalAmountVested = calculateTotalAmountVested(_beneficiary, allocation.startTimestamp, allocation.endTimestamp, allocation.initialAmount);
@@ -173,30 +181,6 @@ contract TeamDistribution is Ownable {
 
     AVAILABLE_OTHER_SUPPLY = AVAILABLE_OTHER_SUPPLY.add(backToProjectWallet);
     emit RevokedAllocation(_beneficiary);
-  }
-
-  function getAllocationData (address _beneficiary) public view returns (
-    uint8 _AllocationSupply,
-    uint256 _startTimestamp,
-    uint256 _endTimestamp,
-    uint256 _lockPeriod,
-    uint256 _initialAmount,
-    uint256 _amountClaimed,
-    bool _revocable,
-    bool _revoked
-  ){
-    Allocation storage allocationData = allocations[_beneficiary];
-
-    return (
-        allocationData.AllocationSupply,
-        allocationData.startTimestamp,
-        allocationData.endTimestamp,
-        allocationData.lockPeriod,
-        allocationData.initialAmount,
-        allocationData.amountClaimed,
-        allocationData.revocable,
-        allocationData.revoked
-    );
   }
 
   /**

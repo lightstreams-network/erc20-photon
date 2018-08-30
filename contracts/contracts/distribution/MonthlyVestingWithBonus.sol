@@ -53,6 +53,10 @@ contract MonthlyVestingWithBonus is Ownable {
     vestedToken = _lightstream;
   }
 
+  function returnNow() public returns(uint){
+    return now;
+  }
+
   /**
     * @dev Allow the owner of the contract to assign a new allocation
     * @param _beneficiary The recipient of the allocation
@@ -61,6 +65,19 @@ contract MonthlyVestingWithBonus is Ownable {
     */
   function setVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _bonus) internal {
     //                                    startTimestamp, endTimestamp, lockPeriod, initialAmount, amountClaimed, balance, bonus, revocable, revoked;
+    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _bonus, true, false);
+
+    emit LogNewVesting(_beneficiary, _totalPurchased, _bonus);
+  }
+
+  function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _bonus) internal {
+    VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
+
+    uint256 totalPurchaseDifference = vestingSchedule.initialAmount.sub(_totalPurchased);
+    uint256 totalBonusDifference = vestingSchedule.bonus.sub(_bonus);
+
+    revokedAmount = revokedAmount.add(totalPurchaseDifference).add(totalBonusDifference);
+
     vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _bonus, true, false);
 
     emit LogNewVesting(_beneficiary, _totalPurchased, _bonus);
@@ -213,6 +230,13 @@ contract MonthlyVestingWithBonus is Ownable {
     }
 
     return 0;
+  }
+
+  function transferRevokedTokens(address _recipient, uint256 _amount) public onlyOwner {
+    require(_amount <= revokedAmount);
+    require(_recipient != address(0));
+
+    require(vestedToken.transfer(_recipient, _amount));
   }
 
   // Allow transfer of accidentally sent ERC20 tokens

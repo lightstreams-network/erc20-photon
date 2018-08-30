@@ -6,6 +6,8 @@ import "../token/MintableToken.sol";
 import "../utils/SafeMath.sol";
 import "../utils/Ownable.sol";
 import "../escrow/TokenEscrow.sol";
+import "../lifecycle/Pausable.sol";
+import "../LightstreamToken.sol";
 
 
 /**
@@ -21,7 +23,7 @@ import "../escrow/TokenEscrow.sol";
  * behavior.
  */
 
-contract Crowdsale is Ownable, TokenEscrow {
+contract Crowdsale is Ownable, TokenEscrow, Pausable {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
@@ -79,7 +81,7 @@ contract Crowdsale is Ownable, TokenEscrow {
    * @param _wallet Address where collected funds will be forwarded to
    * @param _token Address of the token being sold
    */
-  constructor(uint256 _rate, address _wallet, MintableToken _token, uint256 _openingTime) public {
+  constructor(uint256 _rate, address _wallet, ERC20 _token, uint256 _openingTime) public {
     require(_rate > 0);
     require(_wallet != address(0));
     require(_token != address(0));
@@ -106,11 +108,14 @@ contract Crowdsale is Ownable, TokenEscrow {
     return now;
   }
 
+  function returnTimestamp() public returns(uint256) {
+    return block.timestamp;
+  }
   /**
    * @dev low level token purchase ***DO NOT OVERRIDE***
    * @param _beneficiary Address performing the token purchase
    */
-  function buyTokens(address _beneficiary) public payable {
+  function buyTokens(address _beneficiary) public payable whenNotPaused {
     uint256 weiAmount = msg.value;
 
     emit LogInt('weiAmount', weiAmount);
@@ -129,19 +134,19 @@ contract Crowdsale is Ownable, TokenEscrow {
     weiRaised = weiRaised.add(weiAmount);
     tokensSold = tokensSold.add(tokens).add(bonus);
 
-   //_processPurchase(_beneficiary, tokens, bonus);
+   _processPurchase(_beneficiary, tokens, bonus);
 
-//    emit TokenPurchase(
-//      msg.sender,
-//      _beneficiary,
-//      weiAmount,
-//      tokens
-//    );
+    emit TokenPurchase(
+      msg.sender,
+      _beneficiary,
+      weiAmount,
+      tokens
+    );
 
-    //_updatePurchasingState(_beneficiary, weiAmount);
+    _updatePurchasingState(_beneficiary, weiAmount);
 
-    //_forwardFunds();
-    //_postValidatePurchase(_beneficiary, weiAmount);
+    _forwardFunds();
+    _postValidatePurchase(_beneficiary, weiAmount);
   }
 
   /**
@@ -374,5 +379,12 @@ contract Crowdsale is Ownable, TokenEscrow {
     ERC20 refundToken = ERC20(_token);
     uint256 balance = refundToken.balanceOf(this);
     require(refundToken.transfer(_recipient, balance));
+  }
+
+  // Update Token Owner Address
+  function updateTokenOwner(address _newOwnerAddress) public onlyOwner {
+    require(_newOwnerAddress != address(0));
+    LightstreamToken lightstreamToken = LightstreamToken(token);
+    lightstreamToken.transferOwnership(_newOwnerAddress);
   }
 }

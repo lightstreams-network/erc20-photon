@@ -12,8 +12,8 @@ const provider = new HDWalletProvider(
 );
 
 const Web3 = require('web3');
-//const web3 = new Web3(ganche.provider());
-const web3 = new Web3(provider);
+const web3 = new Web3(ganche.provider());
+//const web3 = new Web3(provider);
 
 // Lightsteam Token Contract
 const lightstreamTokenPath = path.resolve(__dirname, '../contracts/build/contracts', 'LightstreamToken.json');
@@ -95,14 +95,11 @@ let walletAdress;
  * ownership of the token contract to the crowsale contract
  */
 //function(done)
-before(async function(done) {
-  this.timeout(60 * 1000 * 10);
+before(async ()=> {
+  //this.timeout(60 * 1000 * 10);
   // Get list of accounts provided by Ganche
   accounts = await web3.eth.getAccounts();
   walletAdress = accounts[9];
-  printData('lightstreamTokenContractBytecode', lightstreamTokenBytecode.length);
-  printData('teamDistributionBytecode', teamDistributionBytecode.length);
-  printData('lightstreamCrowdsaleBytecode', lightstreamCrowdsaleBytecode);
 
   // Deploy the Lightstream Token Contract
   printData('lightstreamTokenContractBytecode', lightstreamTokenBytecode.length);
@@ -131,23 +128,9 @@ before(async function(done) {
 
   // Deploy Crowdsale Contract with constructor arguments Start Time, End Time, Wallet for funds to be deposited, and Address of Lightingstream Token
   try {
-     printData('lightstreamCrowdsaleBytecode', lightstreamCrowdsaleBytecode);
+    printData('lightstreamCrowdsaleBytecode', lightstreamCrowdsaleBytecode.length);
     sampleCrowdsaleContract = await new web3.eth.Contract(lightstreamCrowdsaleAbi)
       .deploy({ data: lightstreamCrowdsaleBytecode, arguments: [startTime.toString(), endTime.toString(), walletAdress, lightstreamTokenAddress, distributionContractAddress]})
-      .send({ from: accounts[0], gas: '4712388', gasLimit: '10000000' });
-
-      // uint256 _openingTime,
-      // uint256 _closingTime,
-      // uint256 _rate,
-      // address _wallet,
-      // uint256 _cap,
-      // MintableToken _token,
-      // uint256 _goal
-
-    //_rate, _wallet, _token
-    // startTime.toString(), endTime.toString(), 2733, walletAdress, cap, lightstreamTokenAddress, cap
-    sampleCrowdsaleContract = await new web3.eth.Contract(lightstreamCrowdsaleAbi)
-      .deploy({ data: lightstreamCrowdsaleBytecode, arguments: [startTime.toString(), endTime.toString(), 2733, walletAdress, cap, lightstreamTokenAddress, cap]})
       .send({ from: accounts[0], gas: '6000000' });
   }catch(error){
     printData('sampleCrowdsaleContract - Deploy - error', error);
@@ -158,23 +141,8 @@ before(async function(done) {
   // Transfer ownership to the crowdsale contract so only it can mint tokens
   await lightstreamTokenContract.methods.transferOwnership(sampleCrowdsaleContract.options.address).send({ from: accounts[0], gas: '4712388' });
 
-  done();
+  //done();
 });
-
-// 12664 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-// 34238 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-// 12074 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-// 21048 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-// 17462 - bytecode length,  6000000 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-// 17462 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-//  7888 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-//  3676 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-//  3646 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby
-//  3646 - bytecode length,  4712388 gas, - Error: The contract code couldn't be stored, please check your gas limit., - Rinkeby - Didn't work when using contract to inherit crowdsale contract and initialize in constructor
-//  3220 - bytecode length,  4712388 gas, Worked when only deploying base contract and commenting out - require(_rate > 0); require(_wallet != address(0)); require(_token != address(0));
-//  3886 - bytecode length,  4712388 gas, Worked when using TimedContract in constructor and commenting out - require(_rate > 0); require(_wallet != address(0)); require(_token != address(0));
-//  4302 - bytecode length,  4712388 gas, Didn't work when using TimedContract, CappedCrowdsale and RefundableCrowdsale in constructor and commenting out - require(_rate > 0); require(_wallet != address(0)); require(_token != address(0));
-//              didn't log,  4712388 gas, - Error:VM Exception while processing transaction: out of gas              , - Ganache
 
 /*
  * Tests to that the Lightstream Token and Whitelisted Crowdsale Contracts were deployed and have an address
@@ -198,7 +166,7 @@ describe('The contacts are deployed', ()=> {
  * Tests the owners ability to add and remove whitelisted addresses found in the Whitelist.sol contract
  */
 
-describe('Tests the Whitelist.sol contract functionality', ()=> {
+describe('Tests the Whitelist.sol contract functionality', async ()=> {
   // addAddressToWhitelist - addAddressToWhitelist(address)
   it('Allows the owner to add an address to the whitelist', async ()=> {
     const addAddressToWhitelist = await sampleCrowdsaleContract.methods.addAddressToWhitelist(accounts[2]).send({ from: accounts[0], gas: '4712388' });
@@ -360,7 +328,7 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
         gas: '4712388'
       });
 
-      printData('purchaseTransaction', purchaseTransaction.events);
+      //printData('purchaseTransaction', purchaseTransaction.events);
 
     } catch (error) {
       printData('purchaseTransaction - error', error.results);
@@ -381,7 +349,7 @@ describe("Tests the Crowdsale.sol functionality", async ()=> {
 
         const mintAndVest  = await sampleCrowdsaleContract.methods.mintAndVest(accounts[2], mintAmount, bonusAmount).send({ from: accounts[0], gas: '4712388' });
 
-        printData('mintAndVest', mintAndVest.events);
+        //printData('mintAndVest', mintAndVest.events);
 
       } catch(error){
         printData('mintAndVest - error', error);
@@ -527,6 +495,8 @@ describe("Tests the distribution contract", async ()=> {
 
   it("Has the Lightstream token in it", async ()=> {
     const balance = await lightstreamTokenContract.methods.balanceOf(distributionContractAddress).call();
+
+    printData('Lightstream balance', balance);
   });
 
   // setAllocation (address _beneficiary, uint256 _totalAllocated, AllocationType _supply)
@@ -636,7 +606,7 @@ describe("Bonuses", async ()=> {
   it("Can set a bonus", async ()=> {
     const setBonus = await sampleCrowdsaleContract.methods.setBonus(accounts[8], 3000).send({ from: accounts[0], gas: '4712388' });
 
-    printData('setBonus', setBonus);
+    //printData('setBonus', setBonus);
   });
 
   it("Can get the bonus set for an address", async ()=> {
@@ -665,7 +635,7 @@ describe("Vesting", async ()=> {
   it("Gets the vesting schedule for a ", async ()=> {
     const getVestingSchedule = await sampleCrowdsaleContract.methods.getVestingSchedule(accounts[2]).call();
 
-    printData('getVestingSchedule', getVestingSchedule);
+    //printData('getVestingSchedule', getVestingSchedule);
   });
 });
 
@@ -682,7 +652,7 @@ describe("Escrow", async ()=> {
 
     const mintAndEscrow = await sampleCrowdsaleContract.methods.mintAndEscrow(accounts[7], mintAmount, bonusAmount).send({ from: accounts[0], gas: '4712388' });
 
-    printData('mintAndEscrow', mintAndEscrow);
+    //printData('mintAndEscrow', mintAndEscrow);
   });
 
   // getEscrowData(address)
@@ -696,7 +666,7 @@ describe("Escrow", async ()=> {
   it("Refunds the contributor", async ()=> {
     const refund = await sampleCrowdsaleContract.methods.refund(accounts[7]).send({ from: accounts[0], gas: '4712388' });
 
-    printData('refund', refund);
+    //printData('refund', refund);
   });
 });
 
