@@ -37,7 +37,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   // The rate is the conversion between wei and the smallest and indivisible token unit.
   // So, if you are using a rate of 1 with a DetailedERC20 token with 3 decimals called TOK
   // 1 wei will give you 1 unit, or 0.001 TOK.
-  uint256 public rate;
+  uint16 public rate;
   uint256 public openingTime;
 
   mapping (address => uint256) public bonuses;
@@ -47,6 +47,12 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   uint256 public weiRaised;
   uint256 public tokensSold;
 
+  uint256 private constant decimalFactor = 10 ** uint256(18);
+  uint256 private constant INITIAL_SUPPLY_MAX =   13500000 * decimalFactor; // Max amount that can be minted approximately 2 million USD if sold at .15
+  uint256 private constant INITIAL_SUPPLY_MIN =     330000 * decimalFactor; // Min amount that can be minted approximately 50,000 USD if sold at .15
+  uint256 private constant BONUS_MAX          =   13500000 * decimalFactor; // Min amount that can be minted approximately 50,000 USD if sold at .15
+  uint256 private constant BONUS_MIN          =          0; // Min amount that can be minted approximately 50,000 USD if sold at .15
+
   /**
    * Event for token purchase logging
    * @param purchaser who paid for the tokens
@@ -55,8 +61,8 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    * @param amount amount of tokens purchased
    */
   event TokenPurchase(
-    address indexed purchaser,
-    address indexed beneficiary,
+    address purchaser,
+    address beneficiary,
     uint256 value,
     uint256 amount
   );
@@ -81,7 +87,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    * @param _wallet Address where collected funds will be forwarded to
    * @param _token Address of the token being sold
    */
-  constructor(uint256 _rate, address _wallet, ERC20 _token, uint256 _openingTime) public {
+  constructor(uint16 _rate, address _wallet, ERC20 _token, uint256 _openingTime) public {
     require(_rate > 0);
     require(_wallet != address(0));
     require(_token != address(0));
@@ -116,6 +122,8 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    * @param _beneficiary Address performing the token purchase
    */
   function buyTokens(address _beneficiary) public payable whenNotPaused {
+    require(vestingSchedules[_beneficiary].startTimestamp == 0);
+
     uint256 weiAmount = msg.value;
 
     emit LogInt('weiAmount', weiAmount);
@@ -134,7 +142,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
     weiRaised = weiRaised.add(weiAmount);
     tokensSold = tokensSold.add(tokens).add(bonus);
 
-   _processPurchase(_beneficiary, tokens, bonus);
+    _processPurchase(_beneficiary, tokens, bonus);
 
     emit TokenPurchase(
       msg.sender,
@@ -156,6 +164,8 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
  * @param _bonus number fo PTH to be minted 1 PTH = 1000000000000000000
  */
   function mintAndVest(address _beneficiary, uint256 _tokens, uint256 _bonus) public onlyOwner {
+    require(vestingSchedules[_beneficiary].startTimestamp == 0);
+
     _preValidateMintAndVest(_beneficiary, _tokens, _bonus);
 
     // update state
@@ -190,7 +200,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    * @param _newRate number of PTH given per wei
    */
 
-  function updateRate(uint256 _newRate) public onlyOwner {
+  function updateRate(uint16 _newRate) public onlyOwner {
     uint256 lowestRate = SafeMath.div(
       SafeMath.mul(rate, 9),
       10
@@ -244,8 +254,8 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   )
   internal
   {
-    //require(_beneficiary != address(0));
-    //require(_weiAmount != 0);
+    require(_beneficiary != address(0));
+    require(_weiAmount != 0);
   }
 
   /**
@@ -261,8 +271,8 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   )
   internal
   {
-    require(_tokens >= 1000000000000000000 && _tokens <= 10000000000000000000000000);
-    require(_bonus >= 1000000000000000000 && _bonus <= 10000000000000000000000000);
+    require(_tokens >= INITIAL_SUPPLY_MIN && _tokens <= INITIAL_SUPPLY_MAX);
+    require(_bonus >= BONUS_MIN && _bonus <= BONUS_MAX);
     require(_bonus <= _tokens);
   }
 
@@ -282,6 +292,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
 
   /**
    * @dev Source of tokens. Override this method to modify the way in which the crowdsale ultimately gets and sends its tokens.
+   * @param _beneficiary address to receive tokens after they're minted
    * @param _tokenAmount Number of tokens to be emitted
    */
   function _deliverTokens(
@@ -290,7 +301,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   )
   internal
   {
-    token.safeTransfer(address(this), _tokenAmount);
+    token.safeTransfer(_beneficiary, _tokenAmount);
   }
 
   /**
@@ -301,7 +312,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    */
   function _processPurchase(address _beneficiary, uint256 _tokensPurchased, uint _bonus) internal {
     uint256 totalTokens = _tokensPurchased.add(_bonus);
-    _deliverTokens(_beneficiary, totalTokens);
+    _deliverTokens(address(this), totalTokens);
 
     setVestingSchedule(_beneficiary, _tokensPurchased, _bonus);
   }
@@ -348,15 +359,28 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   internal returns (uint256 _bonus)
   {
     uint256 bonus = 0;
-
-    if(now > openingTime && now < openingTime + 72 hours) {
+    // If within days 0 - 2 contributor gets a 30 percent bonus
+    if(now >= openingTime && now < openingTime + 2 days) {
+      bonus = SafeMath.div(
+        SafeMath.mul(_tokens, 30),
+        100
+      );
+    // If within days 2 - 4 contributor gets a 20 percent bonus
+    } else if (now >= openingTime + 2 days && now < openingTime + 4 days) {
       bonus = SafeMath.div(
         SafeMath.mul(_tokens, 20),
         100
       );
-    } else if (now > openingTime + 72 hours && now < openingTime +  10 days) {
+    // If within days 4 - 6 contributor gets a 10 percent bonus
+    } else if (now >= openingTime + 4 days && now < openingTime + 6 days) {
       bonus = SafeMath.div(
         SafeMath.mul(_tokens, 10),
+        100
+      );
+    // If within days 6 - 8 contributor gets a 5 percent bonus
+    } else if (now >= openingTime + 6 days && now < openingTime + 8 days) {
+      bonus = SafeMath.div(
+        SafeMath.mul(_tokens, 5),
         100
       );
     }

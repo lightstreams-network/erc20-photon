@@ -40,6 +40,7 @@ contract MonthlyVestingWithBonus is Ownable {
     bool revocable;
     bool revoked;
   }
+
   mapping (address => VestingSchedule) public vestingSchedules;
 
   event LogNewVesting(address _beneficiary, uint256 _totalPurchased, uint256 _bonus);

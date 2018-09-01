@@ -33,462 +33,334 @@ const convertFromBnToInt = function(bn) {
   return Number(web3._extend.utils.fromWei(bn.toNumber(), 'ether'));
 }
 
-
-// Team Distribution Constants
-const AVAILABLE_TOTAL_SUPPLY  =          135000000; // Initial amount minted and transfer to team distribution contract
-const AVAILABLE_TEAM_SUPPLY   =           65424000; // 21.81% released over 24 months
-const AVAILABLE_SEED_INVESTORS_SUPPLY =   36000000; // 12.00% released over 5 months
-const AVAILABLE_FOUNDERS_SUPPLY   =       15000000; //  5.00% released over 24 months
-const AVAILABLE_ADVISORS_SUPPLY   =         122100; //  0.04% released at Token Distribution (TD)
-const AVAILABLE_CONSULTANTS_SUPPLY   =     1891300; //  0.63% released at Token Distribution (TD)
-const AVAILABLE_OTHER_SUPPLY   =          16562600; //  5.52% released at Token Distribution (TD)
-
-
-// Team Distribution Constants
-const TEAM_SUPPLY_ID = 0;
-const SEED_INVESTORS_SUPPLY_ID = 1;
-const FOUNDERS_SUPPLY_ID = 2;
-const ADVISORS_SUPPLY_ID = 3;
-const CONSULTANTS_SUPPLY_ID = 4;
-const OTHER_SUPPLY_ID = 5;
-
-const ALLOCATION = {
-  AllocationSupply: 0,
-  startTimestamp: 1,
-  endTimestamp: 2,
-  lockPeriod: 3,
-  initialAmount: 4,
-  amountClaimed: 5,
-  balance: 6,
-  revocable: 7,
-  revoked: 8
+const convertEtherToWeiBN = function(ether) {
+  const etherInWei = web3._extend.utils.toWei(ether, 'ether');
+  return web3._extend.utils.toBigNumber(etherInWei);
 }
 
-contract('LightstreamToken', async (accounts)=> {
+const RATE = 1000;
+
+const VESTING_SCHEDULE = {
+    startTimestamp: 0,
+    endTimestamp: 1,
+    lockPeriod: 2,
+    initialAmount: 3,
+    amountClaimed: 4,
+    balance: 5,
+    bonus: 6,
+    revocable: 7,
+    revoked: 8
+  };
+
+contract('Crowdsale', async (accounts)=> {
+  const OWNER_ACCOUNT =         accounts[0];
+  const CONTRIBUTOR_1_ACCOUNT = accounts[1];
+  const CONTRIBUTOR_2_ACCOUNT = accounts[2];
+  const CONTRIBUTOR_3_ACCOUNT = accounts[3];
+  const CONTRIBUTOR_4_ACCOUNT = accounts[4];
+  const CONTRIBUTOR_5_ACCOUNT = accounts[5];
+  const CONTRIBUTOR_6_ACCOUNT = accounts[6];
+  const MINT_ACCOUNT_1 =        accounts[7];
+  const MINT_ACCOUNT_2 =        accounts[8];
+  const MINT_ACCOUNT_3 =        accounts[9];
+
   it('should deploy the token and store the address', async ()=> {
     const tokenInstance = await LightstreamToken.deployed();
 
     assert(tokenInstance.address, 'Token address couldn\'t be stored');
   });
 
-  it('should transfer the ownership to the crowdsale contract', async ()=> {
-      const instance = await LightstreamToken.deployed();
-      const data = await instance.transferOwnership(LightstreamCrowdsale.address);
-      const owner = await instance.owner();
-
-      assert.equal(LightstreamCrowdsale.address, owner);
-  });
-
-});
-
-
-contract('Team Distribution', async (accounts)=> {
-  const OWNER_ACCOUNT =         accounts[0];
-  const TEAM_MEMEBER_ACCOUNT =  accounts[1];
-  const SEED_INVESTOR_ACCOUNT = accounts[2];
-  const FOUNDER_ACCOUNT =       accounts[3];
-  const ADVISOR_ACCOUNT =       accounts[4];
-  const CONSULTANT_ACCOUNT =    accounts[5];
-  const OTHER_ACCOUNT =         accounts[6];
-
-  it('should deploy the Team Distribution contract and store the address', async ()=>{
-    const teamDistributionInstance = await TeamDistribution.deployed();
-
-    assert(teamDistributionInstance.address, 'Token address couldn\'t be stored');
-  });
-
-  it('When finalize is called on the sales contract the team contract gets 135 million PTH', async ()=>{
-    const crowdsalesInstance = await LightstreamCrowdsale.deployed();
+  it('should transfer the ownership of token to the crowdsale contract so it can mint tokens', async ()=> {
     const tokenInstance = await LightstreamToken.deployed();
-    const data = await tokenInstance.transferOwnership(LightstreamCrowdsale.address);
+    const transferOwnership = await tokenInstance.transferOwnership(LightstreamCrowdsale.address);
+    const owner = await tokenInstance.owner();
 
-    const timeTravelTransaction = await timeTravel(3600 * 24 * 32); // Travel 32 days into the future so sale has finished
+    assert.equal(LightstreamCrowdsale.address, owner, 'The owner of the token was not updated to the crowdsale contact');
+  });
+
+  it('The owner should be able to add an address to the whitelist', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const transaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
+    const whitelisted = await crowdsaleInstance.whitelist(CONTRIBUTOR_1_ACCOUNT);
+    assert(whitelisted, 'Address not added to whitelist');
+  });
+
+  it('The owner should be able to add multiple addresses to the whitelist', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,
+                                                                        CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+    const whitelisted2 = await crowdsaleInstance.whitelist(CONTRIBUTOR_2_ACCOUNT);
+    const whitelisted3 = await crowdsaleInstance.whitelist(CONTRIBUTOR_3_ACCOUNT);
+    const whitelisted4 = await crowdsaleInstance.whitelist(CONTRIBUTOR_4_ACCOUNT);
+    const whitelisted5 = await crowdsaleInstance.whitelist(CONTRIBUTOR_5_ACCOUNT);
+    const whitelisted6 = await crowdsaleInstance.whitelist(CONTRIBUTOR_6_ACCOUNT);
+
+    assert(whitelisted2, 'Address 2 not added to whitelist');
+    assert(whitelisted3, 'Address 3 not added to whitelist');
+    assert(whitelisted4, 'Address 4 not added to whitelist');
+    assert(whitelisted5, 'Address 5 not added to whitelist');
+    assert(whitelisted6, 'Address 6 not added to whitelist');
+  });
+
+  it('Only the owner should be able to add an address to the whitelist', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    try {
+      const transaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
+      assert.equal(true, false);
+    } catch(error) {
+      assert(error);
+    }
+  });
+
+  it('The owner should be able to update the rate at which tokens are minted per wei sent in', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+      const updateRate = await crowdsaleInstance.updateRate(RATE, {from: OWNER_ACCOUNT});
+      const updatedRateBN = await crowdsaleInstance.rate.call();
+      const updatedRate = updatedRateBN.toNumber();
+
+      assert.equal(RATE, updatedRate);
+  });
+
+  it('The owner should not be able to update the rate more than 10 percent up', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+      try {
+        const updateRate = await crowdsaleInstance.updateRate(RATE * 1.11, {from: OWNER_ACCOUNT});
+        assert.equal(true, false);
+      } catch(error){
+        assert(error);
+      }
+  });
+
+  it('The owner should not be able to update the rate more than 10 percent lower', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+      try {
+        const updateRate = await crowdsaleInstance.updateRate(RATE * .89, {from: OWNER_ACCOUNT});
+        assert.equal(true, false);
+      } catch(error){
+        assert(error);
+      }
+  });
+
+  it('Only the owner should be able to update the rate at which tokens are minted per wei sent in', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+    try {
+      const transaction = await crowdsaleInstance.updateRate(RATE, {from: CONTRIBUTOR_2_ACCOUNT });
+      assert.equal(true, false);
+    } catch(error) {
+      assert(error);
+    }
+  });
+
+  it('An address on the whitelist and purchasing in the first 2 days should get a 30 percent bonus', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    const etherInBn = convertEtherToWeiBN(1);
+
+    // Time travel one day into the future so the sale has started
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 1);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
-    const closingTime = await crowdsalesInstance.closingTime.call();
-    const hasClosed = await crowdsalesInstance.hasClosed.call();
-    const returnTimestamp = await crowdsalesInstance.returnTimestamp.call();
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT, value: etherInBn });
+    // Get the balance of PHT the crowd sales contract holds
+    const contractBalanceBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalance = convertFromBnToInt(contractBalanceBN);
+    // Get the vesting schedule of the address
+    const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
 
-    const finalize = await crowdsalesInstance.finalize({from: OWNER_ACCOUNT});
-    const crowdsaleBalanceBN = await tokenInstance.balanceOf(TeamDistribution.address);
-
-    const crowdsaleBalance = convertFromBnToInt(crowdsaleBalanceBN);
-
-    assert(crowdsaleBalance, 135000000);
+    assert.equal(1300, contractBalance);
+    assert.equal(1000, vestedInitialAmount);
+    assert.equal(300, vestedBonus);
   });
 
-  it('The owner can create an allocation from the team supply', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei('240', 'ether');
+  it('The owner should be able mint an initial amount and bonus for a whitelisted address', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    // 333000 is the min and 13.5 million is the max
+    const initialPurchase = convertEtherToWeiBN(500000);
+    const bonus = convertEtherToWeiBN(100000);
 
-    const teamSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_TEAM_SUPPLY.call();
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const transaction = await teamDistributionInstance.setAllocation(TEAM_MEMEBER_ACCOUNT, PHT, TEAM_SUPPLY_ID);
-    const teamMemberAllocationData = await teamDistributionInstance.allocations(TEAM_MEMEBER_ACCOUNT);
+    const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, bonus);
+    // Get the balance of PHT the crowd sales contract holds
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // Get the vesting schedule of the address
+    const vestingSchedule = await crowdsaleInstance.vestingSchedules(MINT_ACCOUNT_1);
+    const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
 
-    const teamSupplyAfterBN = await teamDistributionInstance.AVAILABLE_TEAM_SUPPLY.call();
-
-    const teamMemberAllocation = convertFromBnToInt(teamMemberAllocationData[4]);
-
-    const teamSupplyBefore = convertFromBnToInt(teamSupplyBeforeBN);
-    const teamSupplyAfter = convertFromBnToInt(teamSupplyAfterBN);
-
-    assert.equal(AVAILABLE_TEAM_SUPPLY, teamSupplyBefore);
-    assert.equal(teamMemberAllocation, 240);
-    assert.equal(teamSupplyBefore - teamMemberAllocation, teamSupplyAfter);
-
+    assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
+    assert.equal(500000, vestedInitialAmount);
+    assert.equal(100000, vestedBonus);
   });
 
-  it('The owner can not create an allocation from the team supply greater than the amount allocated to it', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_TEAM_SUPPLY + 100, 'ether');
+  it('The owner should be not be able to mint an initial amount and bonus for a whitelisted address that has a vesting schedule', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    // 333000 is the min and 13.5 million is the max
+    const initialPurchase = convertEtherToWeiBN(500000);
+    const bonus = convertEtherToWeiBN(100000);
 
     try {
-      const transaction = await teamDistributionInstance.setAllocation(SEED_INVESTOR_ACCOUNT, PHT, TEAM_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
-
-  });
-
-  it('The only the owner can create an allocation from the team supply', async ()=> {
-    try {
-      const teamDistributionInstance = await TeamDistribution.deployed();
-      const PHT = web3._extend.utils.toWei('240', 'ether');
-
-      const transaction = await teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, TEAM_SUPPLY_ID, {from: SEED_INVESTOR_ACCOUNT});
-
-      assert(false, true);
+      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, bonus);
+      assert(true, false);
     } catch(error){
       assert(error);
     }
   });
 
-  it('The owner can not create an allocation for an address that already has an allocation', async ()=> {
+  it('The owner should be not be able to mint an initial amount less than the minimum', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    // 333000 is the min and 13.5 million is the max
+    const initialPurchase = convertEtherToWeiBN(300000);
+    const bonus = convertEtherToWeiBN(100000);
+
     try {
-      const teamDistributionInstance = await TeamDistribution.deployed();
-      const PHT = web3._extend.utils.toWei('240', 'ether');
-
-      const transaction = await teamDistributionInstance.setAllocation(TEAM_MEMEBER_ACCOUNT, PHT, TEAM_SUPPLY_ID);
-
-      assert(false, true);
+      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, bonus);
+      assert(true, false);
     } catch(error){
       assert(error);
     }
   });
 
-
-  it('The owner can create an allocation from the seed investors supply', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei('500', 'ether');
-
-    const seedInvestorSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_SEED_INVESTORS_SUPPLY.call();
-
-    const setAllocationTransaction = await teamDistributionInstance.setAllocation(SEED_INVESTOR_ACCOUNT, PHT, SEED_INVESTORS_SUPPLY_ID);
-    const seedInvestorAllocationData = await teamDistributionInstance.allocations(SEED_INVESTOR_ACCOUNT);
-
-    const seedInvestorSupplyAfterBN = await teamDistributionInstance.AVAILABLE_SEED_INVESTORS_SUPPLY.call();
-
-    const seedInvestorAllocation = convertFromBnToInt(seedInvestorAllocationData[4]);
-
-    const seedInvestorSupplyBefore = convertFromBnToInt(seedInvestorSupplyBeforeBN);
-    const seedInvestorSupplyAfter = convertFromBnToInt(seedInvestorSupplyAfterBN);
-
-    assert.equal(AVAILABLE_SEED_INVESTORS_SUPPLY, seedInvestorSupplyBefore);
-    assert.equal(seedInvestorAllocation, 500);
-    assert.equal(seedInvestorSupplyBefore - seedInvestorAllocation, seedInvestorSupplyAfter);
-  });
-
-  it('The owner can not create an allocation from the seed investor supply greater than the amount allocated to it', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_SEED_INVESTORS_SUPPLY + 100, 'ether');
+  it('The owner should be not be able to mint an initial amount greater than the maximum', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    // 333000 is the min and 13.5 million is the max
+    const initialPurchase = convertEtherToWeiBN(14000000);
+    const bonus = convertEtherToWeiBN(100000);
 
     try {
-      const transaction = await teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, SEED_INVESTORS_SUPPLY_ID);
-
-      assert(false, true);
+      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, bonus);
+      assert(true, false);
     } catch(error){
       assert(error);
     }
-
   });
 
-  it('The owner can create an allocation from the founders supply', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei('240', 'ether');
-
-    const founderAllocationDataBefore = await teamDistributionInstance.allocations(FOUNDER_ACCOUNT);
-    console.log('founderAllocationDataBefore', founderAllocationDataBefore);
-
-    const foundersSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_FOUNDERS_SUPPLY.call();
-
-    const setAllocationTransaction = await teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, FOUNDERS_SUPPLY_ID);
-    const founderAllocationData = await teamDistributionInstance.allocations(FOUNDER_ACCOUNT);
-
-    const founderSupplyAfterBN = await teamDistributionInstance.AVAILABLE_FOUNDERS_SUPPLY.call();
-
-    const founderAllocation = convertFromBnToInt(founderAllocationData[4]);
-
-    const founderSupplyBefore = convertFromBnToInt(foundersSupplyBeforeBN);
-    const founderSupplyAfter = convertFromBnToInt(founderSupplyAfterBN);
-
-    assert.equal(AVAILABLE_FOUNDERS_SUPPLY, founderSupplyBefore);
-    assert.equal(founderAllocation, 240);
-    assert.equal(founderSupplyBefore - founderAllocation, founderSupplyAfter);
-  });
-
-
-  it('The owner can create an allocation from the advisors supply', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
+  it('An address on the whitelist and purchasing between day 3 and 4 should get a 20 percent bonus', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
-    const PHT = web3._extend.utils.toWei('100', 'ether');
+    const etherInBn = convertEtherToWeiBN(1);
 
-    const advisorsSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_ADVISORS_SUPPLY.call();
+    // Time travel one day into the future so the sale has started
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
-    const setAllocationTransaction = await teamDistributionInstance.setAllocation(ADVISOR_ACCOUNT, PHT, ADVISORS_SUPPLY_ID);
-    const advisorAllocationData = await teamDistributionInstance.allocations(ADVISOR_ACCOUNT);
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const advisorSupplyAfterBN = await teamDistributionInstance.AVAILABLE_ADVISORS_SUPPLY.call();
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_2_ACCOUNT, {from: CONTRIBUTOR_2_ACCOUNT, value: etherInBn });
+    // Get the balance of PHT the crowd sales contract holds
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // Get the vesting schedule of the address
+    const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_2_ACCOUNT);
+    const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
 
-    const advisorAllocation = convertFromBnToInt(advisorAllocationData[4]);
-
-    const advisorsSupplyBefore = convertFromBnToInt(advisorsSupplyBeforeBN);
-    const advisorsSupplyAfter = convertFromBnToInt(advisorSupplyAfterBN);
-
-    const advisorAccountBalanceBN = await tokenInstance.balanceOf(ADVISOR_ACCOUNT);
-    const advisorAccountBalance = convertFromBnToInt(advisorAccountBalanceBN);
-
-    assert.equal(AVAILABLE_ADVISORS_SUPPLY, advisorsSupplyBefore);
-    assert.equal(advisorAllocation, 100);
-    assert.equal(advisorAccountBalance, 100);
-    assert.equal(advisorsSupplyBefore - advisorAllocation, advisorsSupplyAfter);
+    assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
+    assert.equal(1000, vestedInitialAmount);
+    assert.equal(200, vestedBonus);
   });
 
-  it('The owner can create an allocation from the consultants supply', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
+  it('An address on the whitelist and purchasing between day 4 and 6 should get a 10 percent bonus', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
-    const PHT = web3._extend.utils.toWei('100', 'ether');
+    const etherInBn = convertEtherToWeiBN(1);
 
-    const consultantSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_CONSULTANTS_SUPPLY.call();
+    // Time travel one day into the future so the sale has started
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
-    const setAllocationTransaction = await teamDistributionInstance.setAllocation(CONSULTANT_ACCOUNT, PHT, CONSULTANTS_SUPPLY_ID);
-    const consultantAllocationData = await teamDistributionInstance.allocations(CONSULTANT_ACCOUNT);
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const consultantSupplyAfterBN = await teamDistributionInstance.AVAILABLE_CONSULTANTS_SUPPLY.call();
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_3_ACCOUNT, {from: CONTRIBUTOR_3_ACCOUNT, value: etherInBn });
+    // Get the balance of PHT the crowd sales contract holds
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // Get the vesting schedule of the address
+    const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_3_ACCOUNT);
+    const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
 
-    const consultantAllocation = convertFromBnToInt(consultantAllocationData[4]);
-
-    const consultantSupplyBefore = convertFromBnToInt(consultantSupplyBeforeBN);
-    const consultantSupplyAfter = convertFromBnToInt(consultantSupplyAfterBN);
-
-    const consultantAccountBalanceBN = await tokenInstance.balanceOf(CONSULTANT_ACCOUNT);
-    const consultantAccountBalance = convertFromBnToInt(consultantAccountBalanceBN);
-
-    assert.equal(AVAILABLE_CONSULTANTS_SUPPLY, consultantSupplyBefore);
-    assert.equal(consultantAllocation, 100);
-    assert.equal(consultantAccountBalance, 100);
-    assert.equal(consultantSupplyBefore - consultantAllocation, consultantSupplyAfter);
+    assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
+    assert.equal(1000, vestedInitialAmount);
+    assert.equal(100, vestedBonus);
   });
 
-  it('The owner can create an allocation from the others supply', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
+  it('An address on the whitelist and purchasing between day 6 and 8 should get a 5 percent bonus', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
-    const PHT = web3._extend.utils.toWei('100', 'ether');
+    const etherInBn = convertEtherToWeiBN(1);
 
-    const otherSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_OTHER_SUPPLY.call();
+    // Time travel one day into the future so the sale has started
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
-    const setAllocationTransaction = await teamDistributionInstance.setAllocation(OTHER_ACCOUNT, PHT, OTHER_SUPPLY_ID);
-    const otherAllocationData = await teamDistributionInstance.allocations(OTHER_ACCOUNT);
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const otherSupplyAfterBN = await teamDistributionInstance.AVAILABLE_OTHER_SUPPLY.call();
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_4_ACCOUNT, {from: CONTRIBUTOR_4_ACCOUNT, value: etherInBn });
+    // Get the balance of PHT the crowd sales contract holds
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // Get the vesting schedule of the address
+    const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_4_ACCOUNT);
+    const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
 
-    const otherAllocation = convertFromBnToInt(otherAllocationData[4]);
-
-    const otherSupplyBefore = convertFromBnToInt(otherSupplyBeforeBN);
-    const otherSupplyAfter = convertFromBnToInt(otherSupplyAfterBN);
-
-    const otherAccountBalanceBN = await tokenInstance.balanceOf(OTHER_ACCOUNT);
-    const otherAccountBalance = convertFromBnToInt(otherAccountBalanceBN);
-
-    assert.equal(AVAILABLE_OTHER_SUPPLY, otherSupplyBefore);
-    assert.equal(otherAllocation, 100);
-    assert.equal(otherAccountBalance, 100);
-    assert.equal(otherSupplyBefore - otherAllocation, otherSupplyAfter);
+    assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
+    assert.equal(1000, vestedInitialAmount);
+    assert.equal(50, vestedBonus);
   });
 
-
-
-  it('The team memeber can release their vested amount', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
+  it('An address on the whitelist and purchasing after day 8 should not get a bonus', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
+    const etherInBn = convertEtherToWeiBN(1);
 
-    const nowBefore = await teamDistributionInstance.returnNow.call();
-    console.log('nowBefor', convertFromBnToInt(nowBefore));
+    // Time travel one day into the future so the sale has started
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
-    const timeTravelTransaction = await timeTravel(3600 * 24 * 30 * 3); // Travel 3 months into the future for testing
-    await mineBlock();
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const nowAfter = await teamDistributionInstance.returnNow.call();
-    console.log('nowAfter', convertFromBnToInt(nowAfter));
-    const allocationDataBefore = await teamDistributionInstance.allocations(TEAM_MEMEBER_ACCOUNT);
-    const balanceBeforeRelease = convertFromBnToInt(allocationDataBefore[6]);
-    console.log('endTimes', convertFromBnToInt(allocationDataBefore[2]));
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {from: CONTRIBUTOR_5_ACCOUNT, value: etherInBn });
+    // Get the balance of PHT the crowd sales contract holds
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // Get the vesting schedule of the address
+    const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_5_ACCOUNT);
+    const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
 
-    const released = await teamDistributionInstance.release(TEAM_MEMEBER_ACCOUNT, {from: TEAM_MEMEBER_ACCOUNT});
-
-    const teamMemeberAccountBalanceBN = await tokenInstance.balanceOf(TEAM_MEMEBER_ACCOUNT);
-    const teamMemeberAccountBalance = convertFromBnToInt(teamMemeberAccountBalanceBN);
-
-    const allocationDataAfter = await teamDistributionInstance.allocations(TEAM_MEMEBER_ACCOUNT);
-    const balanceAfterRelease = convertFromBnToInt(allocationDataAfter[6]);
-    const amountClaimedAfterRelease = convertFromBnToInt(allocationDataAfter[5]);
-
-    // team memeber allocation was originally 240 if 3 months pass they
-    // should be allowed to withdraw 30 PTH
-    assert.equal(teamMemeberAccountBalance, 30);
-    assert.equal(amountClaimedAfterRelease, 30);
-    assert.equal(balanceBeforeRelease - teamMemeberAccountBalance, balanceAfterRelease);
-
+    assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
+    assert.equal(1000, vestedInitialAmount);
+    assert.equal(0, vestedBonus);
   });
 
-  it('The someone other than the team memeber can not release the vested amount', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
+  it('An address that has already purchased tokens should not be able to purcahse again', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    const etherInBn = convertEtherToWeiBN(1);
 
-    const nowBefore = await teamDistributionInstance.returnNow.call();
     try {
-      const released = await teamDistributionInstance.release(TEAM_MEMEBER_ACCOUNT, {from: SEED_INVESTOR_ACCOUNT});
-    } catch (error){
+      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {from: CONTRIBUTOR_5_ACCOUNT, value: etherInBn });
+      assert.equal(true, false);
+    } catch(error){
       assert(error);
     }
   });
-
-  it('The the owner can revoke a seed investor\'s vesting', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
-
-    // Get balances before revoking
-    const otherBalanceBeforeBN = await teamDistributionInstance.AVAILABLE_OTHER_SUPPLY.call();
-    const allocationDataBefore = await teamDistributionInstance.allocations(SEED_INVESTOR_ACCOUNT);
-    // revoke vesting
-    const revokeAllocation = await teamDistributionInstance.revokeAllocation(SEED_INVESTOR_ACCOUNT);
-    // Get balances after revoking
-    const otherBalanceAfterBN = await teamDistributionInstance.AVAILABLE_OTHER_SUPPLY.call();
-    const allocationDataAfter = await teamDistributionInstance.allocations(SEED_INVESTOR_ACCOUNT);
-    const seedInvestorBalanceBN = await tokenInstance.balanceOf(SEED_INVESTOR_ACCOUNT);
-
-    // convert from Big Number to an integer
-    const otherBalanceBefore = convertFromBnToInt(otherBalanceBeforeBN);
-    const otherBalanceAfter = convertFromBnToInt(otherBalanceAfterBN);
-    const allocationBalanceBefore = convertFromBnToInt(allocationDataBefore[ALLOCATION.balance]);
-    const allocationBalanceAfter = convertFromBnToInt(allocationDataAfter[ALLOCATION.balance]);
-    const amountClaimed = convertFromBnToInt(allocationDataAfter[ALLOCATION.amountClaimed]);
-    const seedInvestorBalance = convertFromBnToInt(seedInvestorBalanceBN);
-    const addedToOtherBalance = allocationBalanceBefore - amountClaimed;
-
-    assert.equal(amountClaimed, 300);
-    assert.equal(seedInvestorBalance, 300);
-    assert.equal(seedInvestorBalance, amountClaimed);
-    assert.equal(allocationBalanceAfter, 0);
-    assert.equal(otherBalanceBefore + addedToOtherBalance, otherBalanceAfter);
-  });
-
-
-  it('The only the owner can revoke a team memeber\'s vesting', async ()=> {
-    const teamDistributionInstance = await TeamDistribution.deployed();
-
-    const nowBefore = await teamDistributionInstance.returnNow.call();
-    try {
-      const released = await teamDistributionInstance.revokeAllocation(accounts[2], {from: accounts[3]});
-    } catch (error){
-      assert(error);
-    }
-  });
-
-
 });
-
-
-
-
-
-//
-//
-// contract('LightstreamCrowdsale', function(accounts) {
-//   it('should deploy the Lightstream Crowdsale contract and store the address', function(done){
-//     LightstreamCrowdsale.deployed().then(async function(instance) {
-//       assert(instance.address, 'Token address couldn\'t be stored');
-//       done();
-//     });
-//   });
-//
-//   it('The owner should be able to add an address to the whitelist', function(done){
-//     LightstreamCrowdsale.deployed().then(async function(instance) {
-//       const transaction = await instance.addAddressToWhitelist(accounts[1], {from: accounts[0]});
-//       const whitelisted = await instance.whitelist(accounts[1]);
-//       console.log('whitelisted', whitelisted);
-//       assert(whitelisted);
-//       done();
-//     });
-//   });
-//
-//   it('A whitelisted address should be able to purchase tokens', function(done){
-//     LightstreamCrowdsale.deployed().then(async function(instance) {
-//       const etherInWei = web3._extend.utils.toWei(1, 'ether');
-//       const weiBigNumber = web3._extend.utils.toBigNumber(etherInWei);
-//
-//       try {
-//         const timeTravelPromise = await timeTravel(36 * 60 * 60);
-//         const mineBlockPromise = await mineBlock();
-//         const now = await instance.returnNow.call();
-//         const startTime = await instance.openingTime.call();
-//
-//         console.log('sta', startTime);
-//         console.log('now', now);
-//         const transaction = await instance.buyTokens(accounts[1], { from: accounts[1], value: weiBigNumber });
-//
-//       } catch(error){
-//         console.log('timeTravelPromise', error);
-//       }
-//
-//       done();
-//     });
-//   });
-//
-// });
-
-
-// before(async()=> {
-//   LightstreamCrowdsale.deployed().then(async function(instance) {
-//   // finalaize the sale which will mint the tokens and delilver them to the Team Distribution Contract
-//   try {
-//     const closingTime = await instance.closingTime.call();
-//     const hasClosed = await instance.hasClosed.call();
-//     const returnTimestamp = await instance.returnTimestamp.call();
-//     console.log('closingTime         ', closingTime);
-//     console.log('returnTimestampBefor', returnTimestamp);
-//     console.log('hasClosed           ', hasClosed);
-//
-//     const timeTravelTransaction = await timeTravel(3600 * 24 * 30 * 3); // Travel three months into the future for testing
-//     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
-//
-//     const returnTimestampAfter = await instance.returnTimestamp.call();
-//     const hasClosedAfter = await instance.hasClosed.call();
-//     const closingTimeAfter = await instance.closingTime.call();
-//     console.log('closingTimeAfter    ', closingTimeAfter);
-//     console.log('returnTimestampAfter', returnTimestampAfter);
-//     console.log('hasClosedAfter      ', hasClosed);
-//     const owner = await instance.owner.call();
-//     console.log('owner', owner);
-//     console.log('acct0', accounts[0]);
-//
-//     // finalaize the sale which will mint the tokens and delilver them to the Team Distribution Contract
-//     const finalize = await instance.finalize({from: accounts[0]});
-//     console.log(finalize);
-//     const mineAgain = await mineBlock();
-//   } catch(error){
-//     console.log('finalize -- error', error);
-//   }
-// });
-// });

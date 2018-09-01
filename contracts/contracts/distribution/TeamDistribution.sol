@@ -20,7 +20,7 @@ contract TeamDistribution is Ownable {
   uint256 private constant decimalFactor = 10 ** uint256(18);
   enum AllocationType { TEAM, SEED_INVESTORS, FOUNDERS, ADVISORS, CONSULTANTS, OTHER }
 
-  uint256 public constant INITIAL_SUPPLY =             300000000 * decimalFactor;
+  uint256 public constant INITIAL_SUPPLY =             135000000 * decimalFactor;
   uint256 public AVAILABLE_TOTAL_SUPPLY  =             135000000 * decimalFactor;
   uint256 public AVAILABLE_TEAM_SUPPLY   =              65424000 * decimalFactor; // 21.81% released over 24 months
   uint256 public AVAILABLE_SEED_INVESTORS_SUPPLY  =     36000000 * decimalFactor; // 12.00% released over 5 months
@@ -57,7 +57,7 @@ contract TeamDistribution is Ownable {
   }
   mapping (address => Allocation) public allocations;
   
-  event LogNewAllocation(address _recipient, AllocationType indexed _fromSupply, uint256 _totalAllocated, uint256 _grandTotalAllocated);
+  event NewAllocation(address _recipient, AllocationType indexed _fromSupply, uint256 _totalAllocated, uint256 _grandTotalAllocated);
   event RevokedAllocation(address _recipient);
   event Released(address _recipient, uint256 _amount);
   event LogUint(string _type, uint256 _uint);
@@ -144,7 +144,7 @@ contract TeamDistribution is Ownable {
     // Update the total available supply
     AVAILABLE_TOTAL_SUPPLY = AVAILABLE_TOTAL_SUPPLY.sub(_totalAllocated);
     // emit a Log New Allocation event
-    emit LogNewAllocation(_beneficiary, _supply, _totalAllocated, grandTotalAllocated());
+    emit NewAllocation(_beneficiary, _supply, _totalAllocated, grandTotalAllocated());
   }
 
 
@@ -159,16 +159,15 @@ contract TeamDistribution is Ownable {
     uint256 amountWithdrawable = totalAmountVested.sub(allocation.amountClaimed);
     uint256 releasable = withdrawalAllowed(amountWithdrawable,  allocation.startTimestamp, allocation.endTimestamp, allocation.lockPeriod, allocation.initialAmount);
 
-    if(releasable > 0) {
-      token.safeTransfer(_beneficiary, releasable);
+      if(releasable > 0) {
+        allocations[_beneficiary].amountClaimed = allocation.amountClaimed.add(releasable);
+        allocations[_beneficiary].balance = allocation.balance.sub(releasable);
 
-      allocations[_beneficiary].amountClaimed = allocation.amountClaimed.add(releasable);
-      allocations[_beneficiary].balance = allocation.balance.sub(releasable);
+        token.safeTransfer(_beneficiary, releasable);
 
-      emit Released(_beneficiary, releasable);
-    }
+        emit Released(_beneficiary, releasable);
+      }
   }
-
 
   function revokeAllocation (address _beneficiary) onlyOwner public {
     Allocation memory allocation = allocations[_beneficiary];
@@ -208,7 +207,7 @@ contract TeamDistribution is Ownable {
   function calculateTotalAmountVested(address _beneficiary, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _initialAmount) internal view returns (uint256 _amountVested) {
     // If it's past the end time, the whole amount is available.
     if (now >= _endTimestamp) {
-      return allocations[_beneficiary].balance;
+      return allocations[_beneficiary].initialAmount;
     }
 
     // get the amount of time that passed since the start of vesting
@@ -231,6 +230,10 @@ contract TeamDistribution is Ownable {
  */
 
   function withdrawalAllowed(uint256 _amountWithdrawable, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount) internal view returns(uint256) {
+    // If it's past the end time, the whole amount is available.
+    if (now >= _endTimestamp) {
+      return _amountWithdrawable;
+    }
     // calculate the number of time periods vesting is done over
     uint256 lockPeriods = (_endTimestamp.sub(_startTimestamp)).div(_lockPeriod);
     uint256 amountWithdrawablePerLockPeriod = SafeMath.div(_initialAmount, lockPeriods);
@@ -242,8 +245,6 @@ contract TeamDistribution is Ownable {
 
     if (now < _endTimestamp && amountReleasable >= amountWithdrawablePerLockPeriod) {
       return amountReleasable;
-    } else if (now > _endTimestamp) {
-      return _amountWithdrawable;
     }
 
     return 0;

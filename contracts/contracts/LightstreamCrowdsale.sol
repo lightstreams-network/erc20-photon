@@ -34,7 +34,7 @@ contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, MintedCro
   uint256 public maxTokens =           300000000 * decimalFactor; // There will be total 300 million PTH Tokens
   uint256 public tokensForTeam =       135000000 * decimalFactor; // 45 percent will be reserved for the team
   uint256 public tokensForSale =       165000000 * decimalFactor; // 65 percent will be sold in Crowdsale
-  uint256 public initialRate =               2733; // in Eth if Eth = 410 USD for this 2733 PHT = 1 Eth
+  uint16 public initialRate =              1090; // in Eth if Eth = 410 USD for this 2733 PHT = 1 Eth
   address public distributionContract;
   address public token;
 
