@@ -138,16 +138,25 @@ contract MonthlyVestingWithBonus is Ownable {
     uint256 amountWithdrawable = totalAmountVested.sub(vestingSchedule.initialAmountClaimed);
 
     uint256 refundable = withdrawalAllowed(amountWithdrawable,  vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount);
-    uint256 backToProjectWallet = vestingSchedule.initialBalance.sub(refundable);
+    uint256 refundableBonus = calculateBonusWithdrawal(vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount, vestingSchedule.initialBonus);
+
+    uint256 toProjectWalletFromInitialAmount = vestingSchedule.initialBalance.sub(refundable);
+    uint256 toProjectWalletFromInitialBonus = vestingSchedule.initialBonus.sub(refundableBonus);
+    uint256 backToProjectWallet = toProjectWalletFromInitialAmount.add(toProjectWalletFromInitialBonus);
+
     revokedAmount = revokedAmount.add(backToProjectWallet);
 
-    if(refundable > 0) {
-      vestedToken.safeTransfer(_beneficiary, refundable);
+    vestingSchedules[_beneficiary].initialAmountClaimed = vestingSchedule.initialAmountClaimed.add(refundable);
+    vestingSchedules[_beneficiary].initialBalance = 0;
+    vestingSchedules[_beneficiary].bonusClaimed = vestingSchedule.bonusClaimed.add(refundableBonus);
+    vestingSchedules[_beneficiary].bonusBalance = 0;
+    vestingSchedules[_beneficiary].revoked = true;
 
-      vestingSchedules[_beneficiary].initialAmountClaimed = vestingSchedule.initialAmountClaimed.add(refundable);
-      vestingSchedules[_beneficiary].initialBalance = 0;
+    if(refundable > 0 || refundableBonus > 0) {
+      uint256 totalRefundable = refundable.add(refundableBonus);
+      vestedToken.safeTransfer(_beneficiary, totalRefundable);
 
-      emit Released(_beneficiary, refundable);
+      emit Released(_beneficiary, totalRefundable);
     }
 
     emit RevokedVesting(_beneficiary);
