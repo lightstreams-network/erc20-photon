@@ -45,11 +45,13 @@ const VESTING_SCHEDULE = {
     endTimestamp: 1,
     lockPeriod: 2,
     initialAmount: 3,
-    amountClaimed: 4,
-    balance: 5,
-    bonus: 6,
-    revocable: 7,
-    revoked: 8
+    initialAmountClaimed: 4,
+    initialBalance: 5,
+    initialBonus: 6,
+    bonusClaimed: 7,
+    bonusBalance: 8,
+    revocable: 9,
+    revoked: 10
   };
 
 contract('Crowdsale', async (accounts)=> {
@@ -183,7 +185,7 @@ contract('Crowdsale', async (accounts)=> {
     // VESTING SCHEDULE
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
-    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialBonus]);
 
     assert.equal(1300, contractPTHBalance);
     assert.equal(1000, vestedInitialAmount);
@@ -196,19 +198,19 @@ contract('Crowdsale', async (accounts)=> {
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
     const initialPurchase = convertEtherToWeiBN(500000);
-    const bonus = convertEtherToWeiBN(100000);
+    const initialBonus = convertEtherToWeiBN(100000);
 
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, bonus);
+    const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, initialBonus);
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
     // Get the vesting schedule of the address
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(MINT_ACCOUNT_1);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
-    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialBonus]);
 
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(500000, vestedInitialAmount);
@@ -220,10 +222,10 @@ contract('Crowdsale', async (accounts)=> {
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
     const initialPurchase = convertEtherToWeiBN(500000);
-    const bonus = convertEtherToWeiBN(100000);
+    const initialBonus = convertEtherToWeiBN(100000);
 
     try {
-      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, bonus);
+      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, initialBonus);
       assert(true, false);
     } catch(error){
       assert(error);
@@ -235,10 +237,10 @@ contract('Crowdsale', async (accounts)=> {
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
     const initialPurchase = convertEtherToWeiBN(300000);
-    const bonus = convertEtherToWeiBN(100000);
+    const initialBonus = convertEtherToWeiBN(100000);
 
     try {
-      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, bonus);
+      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus);
       assert(true, false);
     } catch(error){
       assert(error);
@@ -250,10 +252,10 @@ contract('Crowdsale', async (accounts)=> {
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
     const initialPurchase = convertEtherToWeiBN(14000000);
-    const bonus = convertEtherToWeiBN(100000);
+    const initialBonus = convertEtherToWeiBN(100000);
 
     try {
-      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, bonus);
+      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus);
       assert(true, false);
     } catch(error){
       assert(error);
@@ -264,22 +266,22 @@ contract('Crowdsale', async (accounts)=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     // originally 500000, and 100000
     const initialPurchase = convertEtherToWeiBN(400000);
-    const bonus = convertEtherToWeiBN(50000);
+    const initialBonus = convertEtherToWeiBN(50000);
 
     // GET BALANCES BEFORE
     const revokedAmountBeforeBN = await crowdsaleInstance.revokedAmount.call();
     const revokedAmountBefore = convertFromBnToInt(revokedAmountBeforeBN);
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(MINT_ACCOUNT_1);
-    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
-    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonus]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBonus]);
 
-    const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, bonus);
+    const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, initialBonus);
 
     const revokedAmountAfterBN = await crowdsaleInstance.revokedAmount.call();
     const revokedAmountAfter = convertFromBnToInt(revokedAmountAfterBN);
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(MINT_ACCOUNT_1);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
-    const vestingBonusAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonus]);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    const vestingBonusAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBonus]);
 
     const vestingBalanceDifference = vestingBalanceBefore - vestingBalanceAfter;
     const vestingBonusDifference = vestingBonusBefore - vestingBonusAfter;
@@ -294,10 +296,10 @@ contract('Crowdsale', async (accounts)=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     // originally 500000, and 100000
     const initialPurchase = convertEtherToWeiBN(400000);
-    const bonus = convertEtherToWeiBN(50000);
+    const initialBonus = convertEtherToWeiBN(50000);
 
     try {
-      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, bonus, {from: MINT_ACCOUNT_3});
+      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, initialBonus, {from: MINT_ACCOUNT_3});
       assert.equal(true, false);
     } catch(error){
       assert(error);
@@ -308,10 +310,10 @@ contract('Crowdsale', async (accounts)=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     // originally 500000, and 100000
     const initialPurchase = convertEtherToWeiBN(400000);
-    const bonus = convertEtherToWeiBN(50000);
+    const initialBonus = convertEtherToWeiBN(50000);
 
     try {
-      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_2, initialPurchase, bonus);
+      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_2, initialPurchase, initialBonus);
       assert.equal(true, false);
     } catch(error){
       assert(error);
@@ -357,7 +359,7 @@ contract('Crowdsale', async (accounts)=> {
     // Get the vesting schedule of the address
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_2_ACCOUNT);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
-    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialBonus]);
 
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
@@ -383,7 +385,7 @@ contract('Crowdsale', async (accounts)=> {
     // Get the vesting schedule of the address
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_3_ACCOUNT);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
-    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialBonus]);
 
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
@@ -409,7 +411,7 @@ contract('Crowdsale', async (accounts)=> {
     // Get the vesting schedule of the address
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_4_ACCOUNT);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
-    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialBonus]);
 
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
@@ -435,7 +437,7 @@ contract('Crowdsale', async (accounts)=> {
     // Get the vesting schedule of the address
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_5_ACCOUNT);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
-    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
+    const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialBonus]);
 
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
@@ -481,8 +483,8 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
     const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
 
     // RELEASE
     const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
@@ -493,19 +495,19 @@ contract('Crowdsale', async (accounts)=> {
     const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
 
-    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+    const initialAmountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
 
     console.log('Month 1');
     console.log('vestingScheduleBefore', vestingScheduleBefore);
     console.log('vestingScheduleAfter', vestingScheduleAfter);
     console.log('----------------------------------------------------------------------------------');
 
-    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
-    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
-    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, initialAmountClaimed);
   });
 
   // 30 DAYS LATER - 60 TOTAL
@@ -519,8 +521,8 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
     const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
 
     // Time travel 30 days into the future so the sale has ended
     const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
@@ -536,19 +538,19 @@ contract('Crowdsale', async (accounts)=> {
     const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
 
-    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+    const initialAmountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
 
     console.log('Month 2');
     console.log('vestingScheduleBefore', vestingScheduleBefore);
     console.log('vestingScheduleAfter', vestingScheduleAfter);
     console.log('----------------------------------------------------------------------------------');
 
-    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
-    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
-    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, initialAmountClaimed);
   });
 
   // 30 DAYS LATER - 90 TOTAL
@@ -562,8 +564,8 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
     const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
 
     // Time travel 30 days into the future
     const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
@@ -579,19 +581,19 @@ contract('Crowdsale', async (accounts)=> {
     const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
 
-    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+    const initialAmountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
 
     console.log('Month 3');
     console.log('vestingScheduleBefore', vestingScheduleBefore);
     console.log('vestingScheduleAfter', vestingScheduleAfter);
     console.log('----------------------------------------------------------------------------------');
 
-    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
-    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
-    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, initialAmountClaimed);
   });
 
   // 30 DAYS LATER - 120 TOTAL
@@ -605,8 +607,8 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
     const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
 
     // Time travel 30 days into the future
     const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
@@ -622,19 +624,19 @@ contract('Crowdsale', async (accounts)=> {
     const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
 
-    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+    const initialAmountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
 
     console.log('Month 4');
     console.log('vestingScheduleBefore', vestingScheduleBefore);
     console.log('vestingScheduleAfter', vestingScheduleAfter);
     console.log('----------------------------------------------------------------------------------');
 
-    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
-    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
-    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, initialAmountClaimed);
   });
 
   // 150 DAYS
@@ -652,8 +654,8 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
     const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
-    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
     console.log('vestingScheduleBefore', vestingScheduleBefore);
 
     // RELEASE
@@ -665,9 +667,9 @@ contract('Crowdsale', async (accounts)=> {
     const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
     const vestingInitialAmount = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmount]);
-    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
 
 
     console.log('Month 5');
@@ -675,11 +677,11 @@ contract('Crowdsale', async (accounts)=> {
     console.log('vestingScheduleAfter', vestingScheduleAfter);
     console.log('----------------------------------------------------------------------------------');
 
-    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+    const initialAmountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
 
-    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed, 'contractBalanceAfter');
-    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed, 'accountBalanceBefore');
-    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed, 'amountClaimed');
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimed, 'contractBalanceAfter');
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimed, 'accountBalanceBefore');
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, initialAmountClaimed, 'initialAmountClaimed');
     assert.equal(vestingBalanceAfter, 0, 'vestingBalanceAfter');
     assert.equal(vestingInitialAmount, vestingAmountClaimedAfter, 'vestingInitialAmount');
   });
@@ -694,30 +696,42 @@ contract('Crowdsale', async (accounts)=> {
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
     // GET BALANCES BEFORE RELEASE
+    // CROWDSALE CONTRACT
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
-    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    // CONTRIBUTORS ACCOUNT/WALLET
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    // VESTING SCHEDULE
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonus]);
-    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
-    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    // PURCHASED AMOUNT
+    const vestingInitialAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    // BONUS
+    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusBalance]);
+    const vestingBonusClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusClaimed]);
 
     // RELEASE
     const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
 
     // GET BALANCES AFTER RELEASE
+    // CROWDSALE CONTRACT
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // CONTRIBUTORS ACCOUNT/WALLET
     const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    // VESTING SCHEDULE
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
-    const vestingBonusAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonus]);
-    const vestingInitialAmount = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmount]);
-    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+    // PURCHASED AMOUNT
+    const vestingInitialAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
+    const vestingInitialAmountBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    // BONUS
+    const vestingBonusBalaceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonusBalance]);
+    const vestingBonusClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonusClaimed]);
 
-    const bonusDifference = vestingBonusBefore - vestingBonusAfter;
+    const initialAmountClaimedDifference = vestingInitialAmountClaimedBefore - vestingInitialAmountClaimedAfter;
+    const bonusDifference = vestingBonusClaimedAfter - vestingBonusClaimedBefore;
 
 
     console.log('Month 6 - BONUS');
@@ -725,17 +739,19 @@ contract('Crowdsale', async (accounts)=> {
     console.log('vestingScheduleAfter', vestingScheduleAfter);
     console.log('----------------------------------------------------------------------------------');
 
-    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
 
-    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed, 'contractBalanceAfter');
-    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed, 'accountBalanceBefore');
-    assert.equal(vestingBalanceAfter, 0, 'vestingBalanceAfter');
-    assert.equal(bonusDifference, amountClaimed, 'bonusDifference');
+    // CHECK THE CROWDSALE CONTRACT BALANCE
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimedDifference - bonusDifference, 'contractBalanceAfter');
+    // CHECK THE CONTRIBUTORS ACCOUNT/WALLET BALANCE
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimedDifference - bonusDifference, 'accountBalanceBefore');
+    // CHECK THE VESTING SCHEDULE
+    assert.equal(vestingInitialAmountBalanceAfter, 0, 'vestingInitialAmountBalanceAfter');
+    assert.equal(bonusDifference, accountBalanceAfter - accountBalanceBefore - initialAmountClaimedDifference, 'bonusDifference');
   });
 
   // 210 DAYS - BONUS
-  it('The first contributor should be able to release the first part of their bonus', async ()=> {
-    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+  it('The first contributor should be able to release the last part of their bonus', async ()=> {
+  const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
     // Time travel 1 month into the future
@@ -743,44 +759,146 @@ contract('Crowdsale', async (accounts)=> {
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
     // GET BALANCES BEFORE RELEASE
+    // CROWDSALE CONTRACT
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
-    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    // CONTRIBUTORS ACCOUNT/WALLET
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    // VESTING SCHEDULE
     const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonus]);
-    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
-    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    // PURCHASED AMOUNT
+    const vestingInitialAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    // BONUS
+    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusBalance]);
+    const vestingBonusClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusClaimed]);
 
     // RELEASE
     const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
 
     // GET BALANCES AFTER RELEASE
+    // CROWDSALE CONTRACT
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // CONTRIBUTORS ACCOUNT/WALLET
     const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
     const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    // VESTING SCHEDULE
     const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
-    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
-    const vestingBonusAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonus]);
-    const vestingInitialAmount = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmount]);
-    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+    // PURCHASED AMOUNT
+    const vestingInitialAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
+    const vestingInitialAmountBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    // BONUS
+    const vestingBonusBalaceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonusBalance]);
+    const vestingBonusClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonusClaimed]);
 
-    const bonusDifference = vestingBonusBefore - vestingBonusAfter;
+    const initialAmountClaimedDifference = vestingInitialAmountClaimedBefore - vestingInitialAmountClaimedAfter;
+    const bonusDifference = vestingBonusClaimedAfter - vestingBonusClaimedBefore;
 
 
-    console.log('Month 7 - BONUS');
+    console.log('Month 6 - BONUS');
     console.log('vestingScheduleBefore', vestingScheduleBefore);
     console.log('vestingScheduleAfter', vestingScheduleAfter);
     console.log('----------------------------------------------------------------------------------');
 
-    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
 
-    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed, 'contractBalanceAfter');
-    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed, 'accountBalanceBefore');
-    assert.equal(vestingBalanceAfter, 0, 'vestingBalanceAfter');
-    assert.equal(bonusDifference, amountClaimed, 'bonusDifference');
-    assert.equal(0, vestingBonusAfter, 'vestingBonusAfter');
+    // CHECK THE CROWDSALE CONTRACT BALANCE
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimedDifference - bonusDifference, 'contractBalanceAfter');
+    // CHECK THE CONTRIBUTORS ACCOUNT/WALLET BALANCE
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimedDifference - bonusDifference, 'accountBalanceBefore');
+    // CHECK THE VESTING SCHEDULE
+    assert.equal(vestingInitialAmountBalanceAfter, 0, 'vestingInitialAmountBalanceAfter');
+    assert.equal(bonusDifference, accountBalanceAfter - accountBalanceBefore - initialAmountClaimedDifference, 'bonusDifference');
+  });
+
+  // 210 DAYS - BONUS
+  it('The first contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    try {
+      // RELEASE
+      const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+      assert.equal(true, false);
+    } catch(error){
+      assert(error);
+    }
+  });
+
+    // 210 DAYS - BONUS
+  it('The second contributor should be able to release all of their initial amount and bonus', async ()=> {
+  const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // GET BALANCES BEFORE RELEASE
+    // CROWDSALE CONTRACT
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    // CONTRIBUTORS ACCOUNT/WALLET
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_2_ACCOUNT);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    // VESTING SCHEDULE
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_2_ACCOUNT);
+    // PURCHASED AMOUNT
+    const vestingInitialAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBalance]);
+    // BONUS
+    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusBalance]);
+    const vestingBonusClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusClaimed]);
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, { from: CONTRIBUTOR_2_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    // CROWDSALE CONTRACT
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // CONTRIBUTORS ACCOUNT/WALLET
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_2_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    // VESTING SCHEDULE
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_2_ACCOUNT);
+    // PURCHASED AMOUNT
+    const vestingInitialAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmountClaimed]);
+    const vestingInitialAmountBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialBalance]);
+    // BONUS
+    const vestingBonusBalaceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonusBalance]);
+    const vestingBonusClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonusClaimed]);
+
+    const initialAmountClaimedDifference = vestingInitialAmountClaimedAfter - vestingInitialAmountClaimedBefore;
+    const bonusDifference = vestingBonusClaimedAfter - vestingBonusClaimedBefore;
+
+
+
+    console.log('Month 6 - BONUS');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+    console.log('initialAmountClaimedDifference', initialAmountClaimedDifference);
+    console.log('bonusDifference', bonusDifference);
+    console.log('contractBalanceBefore', contractBalanceBefore);
+    console.log('contractBalanceAfter ', contractBalanceAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+
+    // CHECK THE CROWDSALE CONTRACT BALANCE
+    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimedDifference - bonusDifference, 'contractBalanceAfter');
+    // CHECK THE CONTRIBUTORS ACCOUNT/WALLET BALANCE
+    assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimedDifference - bonusDifference, 'accountBalanceBefore');
+    // CHECK THE VESTING SCHEDULE
+    assert.equal(vestingInitialAmountBalanceAfter, 0, 'vestingInitialAmountBalanceAfter');
+    assert.equal(bonusDifference, accountBalanceAfter - accountBalanceBefore - initialAmountClaimedDifference, 'bonusDifference');
+  });
+
+    // 210 DAYS - BONUS
+  it('The second contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    try {
+      // RELEASE
+      const release = await crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, { from: CONTRIBUTOR_2_ACCOUNT });
+      assert.equal(true, false);
+    } catch(error){
+      assert(error);
+    }
   });
 
 });

@@ -36,16 +36,18 @@ contract MonthlyVestingWithBonus is Ownable {
     uint256 endTimestamp;
     uint256 lockPeriod;
     uint256 initialAmount;
-    uint256 amountClaimed;
-    uint256 balance;
-    uint256 bonus;
+    uint256 initialAmountClaimed;
+    uint256 initialBalance;
+    uint256 initialBonus;
+    uint256 bonusClaimed;
+    uint256 bonusBalance;
     bool revocable;
     bool revoked;
   }
 
   mapping (address => VestingSchedule) public vestingSchedules;
 
-  event LogNewVesting(address _beneficiary, uint256 _totalPurchased, uint256 _bonus);
+  event LogNewVesting(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus);
   event Released(address _recipient, uint256 _amount);
   event RevokedVesting(address _beneficiary);
   event LogInt(string _string, uint256 _uint256);
@@ -65,63 +67,60 @@ contract MonthlyVestingWithBonus is Ownable {
     * @dev Allow the owner of the contract to assign a new allocation
     * @param _beneficiary The recipient of the allocation
     * @param _totalPurchased The total amount of LIGHTSTREAM purchased
-    * @param _bonus The investors bonus from purchasing
+    * @param _initialBonus The investors bonus from purchasing
     */
-  function setVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _bonus) internal {
+  function setVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus) internal {
     require(vestingSchedules[_beneficiary].startTimestamp == 0);
 
-    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _bonus, true, false);
+    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _initialBonus, 0, _initialBonus, true, false);
 
-    emit LogNewVesting(_beneficiary, _totalPurchased, _bonus);
+    emit LogNewVesting(_beneficiary, _totalPurchased, _initialBonus);
   }
 
-  function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _bonus) public onlyOwner {
+  function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus) public onlyOwner {
     require(vestingSchedules[_beneficiary].startTimestamp != 0);
     require(vestingSchedules[_beneficiary].initialAmount >= _totalPurchased);
-    require(vestingSchedules[_beneficiary].bonus >=  _bonus);
+    require(vestingSchedules[_beneficiary].initialBonus >=  _initialBonus);
 
     VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
 
     uint256 totalPurchaseDifference = vestingSchedule.initialAmount.sub(_totalPurchased);
-    uint256 totalBonusDifference = vestingSchedule.bonus.sub(_bonus);
+    uint256 totalBonusDifference = vestingSchedule.initialBonus.sub(_initialBonus);
 
     revokedAmount = revokedAmount.add(totalPurchaseDifference).add(totalBonusDifference);
 
-    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _bonus, true, false);
+    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _initialBonus, 0, _initialBonus, true, false);
 
-    emit LogNewVesting(_beneficiary, _totalPurchased, _bonus);
+    emit LogNewVesting(_beneficiary, _totalPurchased, _initialBonus);
   }
 
   function release(address _beneficiary) public returns(uint){
-    require(vestingSchedules[_beneficiary].balance > 0 || vestingSchedules[_beneficiary].bonus > 0);
+    require(vestingSchedules[_beneficiary].initialBalance > 0 || vestingSchedules[_beneficiary].initialBonus > 0);
     require(msg.sender == _beneficiary);
 
     VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
-    emit LogInt('vestingSchedule.amountClaimed', vestingSchedule.amountClaimed);
+
     uint256 totalAmountVested = calculateTotalAmountVested(_beneficiary, vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.initialAmount);
-    uint256 amountWithdrawable = totalAmountVested.sub(vestingSchedule.amountClaimed);
-    emit LogInt('amountWithdrawable', amountWithdrawable);
+    uint256 amountWithdrawable = totalAmountVested.sub(vestingSchedule.initialAmountClaimed);
     uint256 releasable = withdrawalAllowed(amountWithdrawable,  vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount);
 
-    emit LogInt('releasable', releasable);
-
     if(releasable > 0) {
-      vestingSchedules[_beneficiary].amountClaimed = vestingSchedule.amountClaimed.add(releasable);
-      vestingSchedules[_beneficiary].balance = vestingSchedule.balance.sub(releasable);
+      vestingSchedules[_beneficiary].initialAmountClaimed = vestingSchedule.initialAmountClaimed.add(releasable);
+      vestingSchedules[_beneficiary].initialBalance = vestingSchedule.initialBalance.sub(releasable);
 
       vestedToken.safeTransfer(_beneficiary, releasable);
 
       emit Released(_beneficiary, releasable);
     }
 
-    if (now > vestingSchedule.endTimestamp && vestingSchedule.bonus > 0) {
-      uint256 withdrawableBonus = calculateBonusWithdrawal(vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount, vestingSchedule.bonus);
+    if (now > vestingSchedule.endTimestamp && vestingSchedule.initialBonus > 0) {
+      uint256 withdrawableBonus = calculateBonusWithdrawal(vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount, vestingSchedule.initialBonus);
 
       if(withdrawableBonus > 0) {
         vestedToken.safeTransfer(_beneficiary, withdrawableBonus);
 
-        vestingSchedules[_beneficiary].amountClaimed = vestingSchedule.amountClaimed.add(withdrawableBonus);
-        vestingSchedules[_beneficiary].bonus = vestingSchedule.bonus.sub(withdrawableBonus);
+        vestingSchedules[_beneficiary].bonusClaimed = vestingSchedule.bonusClaimed.add(withdrawableBonus);
+        vestingSchedules[_beneficiary].bonusBalance = vestingSchedule.initialBonus.sub(withdrawableBonus);
 
         emit Released(_beneficiary, withdrawableBonus);
       }
@@ -136,17 +135,17 @@ contract MonthlyVestingWithBonus is Ownable {
     VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
 
     uint256 totalAmountVested = calculateTotalAmountVested(_beneficiary, vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.initialAmount);
-    uint256 amountWithdrawable = totalAmountVested.sub(vestingSchedule.amountClaimed);
+    uint256 amountWithdrawable = totalAmountVested.sub(vestingSchedule.initialAmountClaimed);
 
     uint256 refundable = withdrawalAllowed(amountWithdrawable,  vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount);
-    uint256 backToProjectWallet = vestingSchedule.balance.sub(refundable);
+    uint256 backToProjectWallet = vestingSchedule.initialBalance.sub(refundable);
     revokedAmount = revokedAmount.add(backToProjectWallet);
 
     if(refundable > 0) {
       vestedToken.safeTransfer(_beneficiary, refundable);
 
-      vestingSchedules[_beneficiary].amountClaimed = vestingSchedule.amountClaimed.add(refundable);
-      vestingSchedules[_beneficiary].balance = 0;
+      vestingSchedules[_beneficiary].initialAmountClaimed = vestingSchedule.initialAmountClaimed.add(refundable);
+      vestingSchedules[_beneficiary].initialBalance = 0;
 
       emit Released(_beneficiary, refundable);
     }
@@ -156,7 +155,7 @@ contract MonthlyVestingWithBonus is Ownable {
 
   /**
  * @notice Calculates the total amount vested since the start time. If after the endTime
- * the entire balance is returned
+ * the entire initialBalance is returned
  */
 
   function calculateTotalAmountVested(address _beneficiary, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _initialAmount) internal view returns (uint256 _amountVested) {
@@ -206,20 +205,20 @@ contract MonthlyVestingWithBonus is Ownable {
     return 0;
   }
 
-  function calculateBonusWithdrawal(uint256 _startTimestamp, uint _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount, uint256 _bonus) internal view returns(uint256) {
+  function calculateBonusWithdrawal(uint256 _startTimestamp, uint _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount, uint256 _initialBonus) internal view returns(uint256) {
     // calculate the number of time periods vesting is done over
     uint256 lockPeriods = (_endTimestamp.sub(_startTimestamp)).div(_lockPeriod);
     uint256 amountWithdrawablePerLockPeriod = SafeMath.div(_initialAmount, lockPeriods);
 
     // get the remainder and subtract it from the amount amount withdrawable to get a multiple of the
     // amount withdrawable per lock period
-    uint256 remainder = SafeMath.mod(_bonus, amountWithdrawablePerLockPeriod);
-    uint256 amountReleasable = _bonus.sub(remainder);
+    uint256 remainder = SafeMath.mod(_initialBonus, amountWithdrawablePerLockPeriod);
+    uint256 amountReleasable = _initialBonus.sub(remainder);
 
     if (now > _endTimestamp.add(30 days) && amountReleasable >= amountWithdrawablePerLockPeriod) {
       return amountWithdrawablePerLockPeriod;
     } else if (now > _endTimestamp.add(60 days)){
-      return _bonus;
+      return _initialBonus;
     }
 
     return 0;
