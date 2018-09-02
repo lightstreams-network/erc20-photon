@@ -164,18 +164,31 @@ contract('Crowdsale', async (accounts)=> {
     const timeTravelTransaction = await timeTravel(3600 * 24 * 1);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
+    // BEFORE TRANSACTION
+    // Get the balance of the owner wallet before the buying tokens transaction
+    const walletEthBalanceBeforeBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceBefore = convertFromBnToInt(walletEthBalanceBeforeBN);
+
+    // BUY TOKENS TRANSACTION
     const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT, value: etherInBn });
-    // Get the balance of PHT the crowd sales contract holds
-    const contractBalanceBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
-    const contractBalance = convertFromBnToInt(contractBalanceBN);
-    // Get the vesting schedule of the address
+
+    // AFTER TRANSACTION
+    // Get the balances of everything after the buy transaction
+    // PTH
+    const contractPHTBalanceBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractPTHBalance = convertFromBnToInt(contractPHTBalanceBN);
+    // ETH
+    const walletEthBalanceAfterBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceAfter = convertFromBnToInt(walletEthBalanceAfterBN);
+    // VESTING SCHEDULE
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
     const vestedBonus = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.bonus]);
 
-    assert.equal(1300, contractBalance);
+    assert.equal(1300, contractPTHBalance);
     assert.equal(1000, vestedInitialAmount);
     assert.equal(300, vestedBonus);
+    assert.equal(walletEthBalanceBefore + 1, walletEthBalanceAfter);
   });
 
   it('The owner should be able mint an initial amount and bonus for a whitelisted address', async ()=> {
@@ -247,12 +260,90 @@ contract('Crowdsale', async (accounts)=> {
     }
   });
 
+  it('The owner should be able to update the vesting schedule if there was an error', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    // originally 500000, and 100000
+    const initialPurchase = convertEtherToWeiBN(400000);
+    const bonus = convertEtherToWeiBN(50000);
+
+    // GET BALANCES BEFORE
+    const revokedAmountBeforeBN = await crowdsaleInstance.revokedAmount.call();
+    const revokedAmountBefore = convertFromBnToInt(revokedAmountBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(MINT_ACCOUNT_1);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
+    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonus]);
+
+    const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, bonus);
+
+    const revokedAmountAfterBN = await crowdsaleInstance.revokedAmount.call();
+    const revokedAmountAfter = convertFromBnToInt(revokedAmountAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(MINT_ACCOUNT_1);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingBonusAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonus]);
+
+    const vestingBalanceDifference = vestingBalanceBefore - vestingBalanceAfter;
+    const vestingBonusDifference = vestingBonusBefore - vestingBonusAfter;
+    const revokedAmountDifference = revokedAmountAfter - revokedAmountBefore;
+
+    assert.equal(revokedAmountDifference, vestingBalanceDifference + vestingBonusDifference);
+    assert.equal(400000, vestingBalanceAfter);
+    assert.equal(50000, vestingBonusAfter);
+  });
+
+  it('Only the owner should be able to update the vesting schedule if there was an error', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    // originally 500000, and 100000
+    const initialPurchase = convertEtherToWeiBN(400000);
+    const bonus = convertEtherToWeiBN(50000);
+
+    try {
+      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, bonus, {from: MINT_ACCOUNT_3});
+      assert.equal(true, false);
+    } catch(error){
+      assert(error);
+    }
+  });
+
+  it('The owner should not be able to update a vesting schedule for an address that does not already have one', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    // originally 500000, and 100000
+    const initialPurchase = convertEtherToWeiBN(400000);
+    const bonus = convertEtherToWeiBN(50000);
+
+    try {
+      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_2, initialPurchase, bonus);
+      assert.equal(true, false);
+    } catch(error){
+      assert(error);
+    }
+  });
+
+  it('The owner should be able to update the address of the owner of the token', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    const updateTokenOwner = await crowdsaleInstance.updateTokenOwner(MINT_ACCOUNT_3);
+    const tokenOwner = await tokenInstance.owner.call();
+
+    assert.equal(MINT_ACCOUNT_3, tokenOwner);
+  });
+
+  it('The new owner should be able to change the address token\'s owner back to the crowdsale contract', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    const updateTokenOwner = await tokenInstance.transferOwnership(LightstreamCrowdsale.address, {from: MINT_ACCOUNT_3});
+    const tokenOwner = await tokenInstance.owner.call();
+
+    assert.equal(LightstreamCrowdsale.address, tokenOwner);
+  });
+
   it('An address on the whitelist and purchasing between day 3 and 4 should get a 20 percent bonus', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
 
-    // Time travel one day into the future so the sale has started
+    // Time travel two days into the future to the next bonus period
     const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
@@ -278,7 +369,7 @@ contract('Crowdsale', async (accounts)=> {
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
 
-    // Time travel one day into the future so the sale has started
+    // Time travel two days into the future to the next bonus period
     const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
@@ -304,7 +395,7 @@ contract('Crowdsale', async (accounts)=> {
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
 
-    // Time travel one day into the future so the sale has started
+    // Time travel two days into the future to the next bonus period
     const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
@@ -351,7 +442,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(0, vestedBonus);
   });
 
-  it('An address that has already purchased tokens should not be able to purcahse again', async ()=> {
+  it('An address that has already purchased tokens should not be able to purchase again', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
@@ -363,4 +454,333 @@ contract('Crowdsale', async (accounts)=> {
       assert(error);
     }
   });
+
+  it('The sale should close and whitelisted addresses should no longer be able to purchase tokens', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    const etherInBn = convertEtherToWeiBN(1);
+
+    // Time travel 22 days into the future so the sale has ended
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 22);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+    try {
+      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_6_ACCOUNT, {from: CONTRIBUTOR_6_ACCOUNT, value: etherInBn });
+    } catch(error) {
+      assert(error);
+    }
+  });
+
+  // 1 MONTH (ISH) AFTER PURCHASE
+  it('The first contributor should be able to release the 1/5th of their vested tokens after 30 days - Month 1', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // GET BALANCES BEFORE RELEASE
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+
+    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+
+    console.log('Month 1');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+  });
+
+  // 30 DAYS LATER - 60 TOTAL
+  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 2', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // GET BALANCES BEFORE RELEASE
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+
+    // Time travel 30 days into the future so the sale has ended
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+
+    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+
+    console.log('Month 2');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+  });
+
+  // 30 DAYS LATER - 90 TOTAL
+  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 3', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // GET BALANCES BEFORE RELEASE
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+
+    // Time travel 30 days into the future
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+
+    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+
+    console.log('Month 3');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+  });
+
+  // 30 DAYS LATER - 120 TOTAL
+  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 4', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // GET BALANCES BEFORE RELEASE
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+
+    // Time travel 30 days into the future
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+
+    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+
+    console.log('Month 4');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed);
+    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed);
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed);
+  });
+
+  // 150 DAYS
+  it('The first contributor should be able to release all of their initial invested tokens', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // Time travel 1 month into the future
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+    // GET BALANCES BEFORE RELEASE
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.balance]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingInitialAmount = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmount]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+
+
+    console.log('Month 5');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+
+    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed, 'contractBalanceAfter');
+    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed, 'accountBalanceBefore');
+    assert.equal(vestingBalanceBefore - vestingBalanceAfter, amountClaimed, 'amountClaimed');
+    assert.equal(vestingBalanceAfter, 0, 'vestingBalanceAfter');
+    assert.equal(vestingInitialAmount, vestingAmountClaimedAfter, 'vestingInitialAmount');
+  });
+
+  // 180 DAYS - BONUS
+  it('The first contributor should be able to release the first part of their bonus', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // Time travel 1 month into the future
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+    // GET BALANCES BEFORE RELEASE
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonus]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingBonusAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonus]);
+    const vestingInitialAmount = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmount]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+
+    const bonusDifference = vestingBonusBefore - vestingBonusAfter;
+
+
+    console.log('Month 6 - BONUS');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+
+    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed, 'contractBalanceAfter');
+    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed, 'accountBalanceBefore');
+    assert.equal(vestingBalanceAfter, 0, 'vestingBalanceAfter');
+    assert.equal(bonusDifference, amountClaimed, 'bonusDifference');
+  });
+
+  // 210 DAYS - BONUS
+  it('The first contributor should be able to release the first part of their bonus', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    // Time travel 1 month into the future
+    const timeTravelTransaction = await timeTravel(3600 * 24 * 30);
+    const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+    // GET BALANCES BEFORE RELEASE
+    const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const accountBalanceBeforeBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
+    const accountBalanceBefore = convertFromBnToInt(accountBalanceBeforeBN);
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBonusBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonus]);
+    const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.amountClaimed]);
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+
+    // RELEASE
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+
+    // GET BALANCES AFTER RELEASE
+    const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
+    const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    const accountBalanceAfterBN = await tokenInstance.balanceOf(CONTRIBUTOR_1_ACCOUNT);
+    const accountBalanceAfter = convertFromBnToInt(accountBalanceAfterBN);
+    const vestingScheduleAfter = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+    const vestingBalanceAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.balance]);
+    const vestingBonusAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.bonus]);
+    const vestingInitialAmount = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.initialAmount]);
+    const vestingAmountClaimedAfter = convertFromBnToInt(vestingScheduleAfter[VESTING_SCHEDULE.amountClaimed]);
+
+    const bonusDifference = vestingBonusBefore - vestingBonusAfter;
+
+
+    console.log('Month 7 - BONUS');
+    console.log('vestingScheduleBefore', vestingScheduleBefore);
+    console.log('vestingScheduleAfter', vestingScheduleAfter);
+    console.log('----------------------------------------------------------------------------------');
+
+    const amountClaimed = vestingAmountClaimedAfter - vestingAmountClaimedBefore;
+
+    assert.equal(contractBalanceAfter, contractBalanceBefore - amountClaimed, 'contractBalanceAfter');
+    assert.equal(accountBalanceBefore, accountBalanceAfter - amountClaimed, 'accountBalanceBefore');
+    assert.equal(vestingBalanceAfter, 0, 'vestingBalanceAfter');
+    assert.equal(bonusDifference, amountClaimed, 'bonusDifference');
+    assert.equal(0, vestingBonusAfter, 'vestingBonusAfter');
+  });
+
 });

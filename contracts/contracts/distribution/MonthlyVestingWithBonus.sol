@@ -16,7 +16,9 @@ contract MonthlyVestingWithBonus is Ownable {
   using SafeERC20 for ERC20;
 
   ERC20 public vestedToken;
-  uint256 revokedAmount = 0;
+  // Pool of revoked tokens and where tokens that have been adjusted from an error minting go
+  // They can be transfered by the owner where ever they want to
+  uint256 public revokedAmount = 0;
 
   /**
    * @dev Creates vesting schedule with vesting information
@@ -46,6 +48,7 @@ contract MonthlyVestingWithBonus is Ownable {
   event LogNewVesting(address _beneficiary, uint256 _totalPurchased, uint256 _bonus);
   event Released(address _recipient, uint256 _amount);
   event RevokedVesting(address _beneficiary);
+  event LogInt(string _string, uint256 _uint256);
 
   /**
     * @dev Constructor function - Set the Lightstream token address
@@ -65,13 +68,18 @@ contract MonthlyVestingWithBonus is Ownable {
     * @param _bonus The investors bonus from purchasing
     */
   function setVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _bonus) internal {
-    //                                    startTimestamp, endTimestamp, lockPeriod, initialAmount, amountClaimed, balance, bonus, revocable, revoked;
+    require(vestingSchedules[_beneficiary].startTimestamp == 0);
+
     vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _bonus, true, false);
 
     emit LogNewVesting(_beneficiary, _totalPurchased, _bonus);
   }
 
-  function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _bonus) internal {
+  function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _bonus) public onlyOwner {
+    require(vestingSchedules[_beneficiary].startTimestamp != 0);
+    require(vestingSchedules[_beneficiary].initialAmount >= _totalPurchased);
+    require(vestingSchedules[_beneficiary].bonus >=  _bonus);
+
     VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
 
     uint256 totalPurchaseDifference = vestingSchedule.initialAmount.sub(_totalPurchased);
@@ -84,19 +92,24 @@ contract MonthlyVestingWithBonus is Ownable {
     emit LogNewVesting(_beneficiary, _totalPurchased, _bonus);
   }
 
-  function release(address _beneficiary) public {
-    require(vestingSchedules[_beneficiary].balance > 0);
+  function release(address _beneficiary) public returns(uint){
+    require(vestingSchedules[_beneficiary].balance > 0 || vestingSchedules[_beneficiary].bonus > 0);
+    require(msg.sender == _beneficiary);
 
     VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
+    emit LogInt('vestingSchedule.amountClaimed', vestingSchedule.amountClaimed);
     uint256 totalAmountVested = calculateTotalAmountVested(_beneficiary, vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.initialAmount);
     uint256 amountWithdrawable = totalAmountVested.sub(vestingSchedule.amountClaimed);
+    emit LogInt('amountWithdrawable', amountWithdrawable);
     uint256 releasable = withdrawalAllowed(amountWithdrawable,  vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount);
 
-    if(releasable > 0) {
-      vestedToken.safeTransfer(_beneficiary, releasable);
+    emit LogInt('releasable', releasable);
 
+    if(releasable > 0) {
       vestingSchedules[_beneficiary].amountClaimed = vestingSchedule.amountClaimed.add(releasable);
       vestingSchedules[_beneficiary].balance = vestingSchedule.balance.sub(releasable);
+
+      vestedToken.safeTransfer(_beneficiary, releasable);
 
       emit Released(_beneficiary, releasable);
     }
@@ -141,32 +154,6 @@ contract MonthlyVestingWithBonus is Ownable {
     emit RevokedVesting(_beneficiary);
   }
 
-  function getVestingSchedule (address _beneficiary) public view returns (
-    uint256 _startTimestamp,
-    uint256 _endTimestamp,
-    uint256 _lockPeriod,
-    uint256 _initialAmount,
-    uint256 _amountClaimed,
-    uint256 _balance,
-    uint256 _bonus,
-    bool _revocable,
-    bool _revoked
-  ){
-    VestingSchedule storage vestingSchedule = vestingSchedules[_beneficiary];
-
-    return (
-      vestingSchedule.startTimestamp,
-      vestingSchedule.endTimestamp,
-      vestingSchedule.lockPeriod,
-      vestingSchedule.initialAmount,
-      vestingSchedule.amountClaimed,
-      vestingSchedule.balance,
-      vestingSchedule.bonus,
-      vestingSchedule.revocable,
-      vestingSchedule.revoked
-    );
-  }
-
   /**
  * @notice Calculates the total amount vested since the start time. If after the endTime
  * the entire balance is returned
@@ -175,7 +162,7 @@ contract MonthlyVestingWithBonus is Ownable {
   function calculateTotalAmountVested(address _beneficiary, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _initialAmount) internal view returns (uint256 _amountVested) {
     // If it's past the end time, the whole amount is available.
     if (now >= _endTimestamp) {
-      return vestingSchedules[_beneficiary].balance;
+      return vestingSchedules[_beneficiary].initialAmount;
     }
 
     // get the amount of time that passed since the start of vesting
@@ -188,6 +175,7 @@ contract MonthlyVestingWithBonus is Ownable {
       totalVestingTime
     );
 
+    emit LogInt('totalAmountVested', vestedAmount);
     return vestedAmount;
   }
 
@@ -198,6 +186,10 @@ contract MonthlyVestingWithBonus is Ownable {
  */
 
   function withdrawalAllowed(uint256 _amountWithdrawable, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount) internal view returns(uint256 _amountReleasable) {
+    // If it's past the end time, the whole amount is available.
+    if (now >= _endTimestamp) {
+      return _amountWithdrawable;
+    }
     // calculate the number of time periods vesting is done over
     uint256 lockPeriods = (_endTimestamp.sub(_startTimestamp)).div(_lockPeriod);
     uint256 amountWithdrawablePerLockPeriod = SafeMath.div(_initialAmount, lockPeriods);

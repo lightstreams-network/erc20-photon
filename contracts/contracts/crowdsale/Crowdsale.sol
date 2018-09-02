@@ -50,8 +50,8 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   uint256 private constant decimalFactor = 10 ** uint256(18);
   uint256 private constant INITIAL_SUPPLY_MAX =   13500000 * decimalFactor; // Max amount that can be minted approximately 2 million USD if sold at .15
   uint256 private constant INITIAL_SUPPLY_MIN =     330000 * decimalFactor; // Min amount that can be minted approximately 50,000 USD if sold at .15
-  uint256 private constant BONUS_MAX          =   13500000 * decimalFactor; // Min amount that can be minted approximately 50,000 USD if sold at .15
-  uint256 private constant BONUS_MIN          =          0; // Min amount that can be minted approximately 50,000 USD if sold at .15
+  uint256 private constant BONUS_MAX          =    5400000 * decimalFactor; //
+  uint256 private constant BONUS_MIN          =          0;                 // Min amount that can be minted approximately 50,000 USD if sold at .15
 
   /**
    * Event for token purchase logging

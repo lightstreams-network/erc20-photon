@@ -20,7 +20,7 @@ module.exports = {
       host: 'localhost',
       port: 8545,
       network_id: '*',
-      gas: 6000000
+      gas: 6721975
     },
     rinkeby: {
       provider: function() {
@@ -28,7 +28,7 @@ module.exports = {
         return new PrivateKeyProvider('4868546F8FDE76879690130D4FAAD3E8B043A0C79528BC04D5E15F9B4FD54FCD', 'https://rinkeby.infura.io/Yqe59oKMsdh4CnwHxAyE')
       },
       network_id: 4,
-      gas: 6000000
+      gas: 6721975
     },
   },
   solc: {
