@@ -1,17 +1,21 @@
+const chai = require('chai')
 let LightstreamToken = artifacts.require("LightstreamToken");
 let TeamDistribution = artifacts.require("distribution/TeamDistribution");
 let LightstreamCrowdsale = artifacts.require("LightstreamCrowdsale");
-
+chai.use(require('chai-as-promised'))
+const assert = chai.assert;
 
 const timeTravel = function (time) {
   return new Promise((resolve, reject) => {
-      web3.currentProvider.sendAsync({
+    web3.currentProvider.sendAsync({
       jsonrpc: "2.0",
       method: "evm_increaseTime",
       params: [time], // 86400 is num seconds in day
       id: new Date().getTime()
     }, (err, result) => {
-      if(err){ return reject(err) }
+      if (err) {
+        return reject(err)
+      }
       return resolve(result)
     });
   })
@@ -19,21 +23,23 @@ const timeTravel = function (time) {
 
 const mineBlock = function () {
   return new Promise((resolve, reject) => {
-      web3.currentProvider.sendAsync({
+    web3.currentProvider.sendAsync({
       jsonrpc: "2.0",
       method: "evm_mine"
     }, (err, result) => {
-      if(err){ return reject(err) }
+      if (err) {
+        return reject(err)
+      }
       return resolve(result)
     });
   })
 };
 
-const convertFromBnToInt = function(bn) {
+const convertFromBnToInt = function (bn) {
   return Number(web3._extend.utils.fromWei(bn.toNumber(), 'ether'));
 }
 
-const convertEtherToWeiBN = function(ether) {
+const convertEtherToWeiBN = function (ether) {
   const etherInWei = web3._extend.utils.toWei(ether, 'ether');
   return web3._extend.utils.toBigNumber(etherInWei);
 }
@@ -41,38 +47,38 @@ const convertEtherToWeiBN = function(ether) {
 const RATE = 1000;
 
 const VESTING_SCHEDULE = {
-    startTimestamp: 0,
-    endTimestamp: 1,
-    lockPeriod: 2,
-    initialAmount: 3,
-    initialAmountClaimed: 4,
-    initialBalance: 5,
-    initialBonus: 6,
-    bonusClaimed: 7,
-    bonusBalance: 8,
-    revocable: 9,
-    revoked: 10
-  };
+  startTimestamp: 0,
+  endTimestamp: 1,
+  lockPeriod: 2,
+  initialAmount: 3,
+  initialAmountClaimed: 4,
+  initialBalance: 5,
+  initialBonus: 6,
+  bonusClaimed: 7,
+  bonusBalance: 8,
+  revocable: 9,
+  revoked: 10
+};
 
-contract('Crowdsale', async (accounts)=> {
-  const OWNER_ACCOUNT =         accounts[0];
+contract('Crowdsale', async (accounts) => {
+  const OWNER_ACCOUNT = accounts[0];
   const CONTRIBUTOR_1_ACCOUNT = accounts[1];
   const CONTRIBUTOR_2_ACCOUNT = accounts[2];
   const CONTRIBUTOR_3_ACCOUNT = accounts[3];
   const CONTRIBUTOR_4_ACCOUNT = accounts[4];
   const CONTRIBUTOR_5_ACCOUNT = accounts[5];
   const CONTRIBUTOR_6_ACCOUNT = accounts[6];
-  const MINT_ACCOUNT_1 =        accounts[7];
-  const MINT_ACCOUNT_2 =        accounts[8];
-  const MINT_ACCOUNT_3 =        accounts[9];
+  const MINT_ACCOUNT_1 = accounts[7];
+  const MINT_ACCOUNT_2 = accounts[8];
+  const MINT_ACCOUNT_3 = accounts[9];
 
-  it('should deploy the token and store the address', async ()=> {
+  it('should deploy the token and store the address', async () => {
     const tokenInstance = await LightstreamToken.deployed();
 
     assert(tokenInstance.address, 'Token address couldn\'t be stored');
   });
 
-  it('should transfer the ownership of token to the crowdsale contract so it can mint tokens', async ()=> {
+  it('should transfer the ownership of token to the crowdsale contract so it can mint tokens', async () => {
     const tokenInstance = await LightstreamToken.deployed();
     const transferOwnership = await tokenInstance.transferOwnership(LightstreamCrowdsale.address);
     const owner = await tokenInstance.owner();
@@ -80,7 +86,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(LightstreamCrowdsale.address, owner, 'The owner of the token was not updated to the crowdsale contact');
   });
 
-  it('The owner should be able to add an address to the whitelist', async ()=> {
+  it('The owner should be able to add an address to the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
     const transaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
@@ -89,7 +95,7 @@ contract('Crowdsale', async (accounts)=> {
     assert(whitelisted, 'Address not added to whitelist');
   });
 
-  it('The owner should be able to remove an address from the whitelist', async ()=> {
+  it('The owner should be able to remove an address from the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
     const removeTransaction = await crowdsaleInstance.removeAddressFromWhitelist(CONTRIBUTOR_1_ACCOUNT);
@@ -100,10 +106,10 @@ contract('Crowdsale', async (accounts)=> {
     const addTransaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
   });
 
-  it('The owner should be able to add multiple addresses to the whitelist', async ()=> {
+  it('The owner should be able to add multiple addresses to the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
-    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT, CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
 
     const whitelisted2 = await crowdsaleInstance.whitelist(CONTRIBUTOR_2_ACCOUNT);
     const whitelisted3 = await crowdsaleInstance.whitelist(CONTRIBUTOR_3_ACCOUNT);
@@ -116,10 +122,10 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(whitelisted5, true, 'Address 5 not added to whitelist');
   });
 
-  it('The owner should be able to remove multiple addresses to the whitelist', async ()=> {
+  it('The owner should be able to remove multiple addresses to the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
-    const transaction = await crowdsaleInstance.removeAddressesFromWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+    const transaction = await crowdsaleInstance.removeAddressesFromWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT, CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
 
     const whitelisted2 = await crowdsaleInstance.whitelist(CONTRIBUTOR_2_ACCOUNT);
     const whitelisted3 = await crowdsaleInstance.whitelist(CONTRIBUTOR_3_ACCOUNT);
@@ -132,10 +138,10 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(whitelisted5, false, 'Address 5 not not removed from whitelist');
   });
 
-  it('The owner should be able to add back multiple addresses to the whitelist', async ()=> {
+  it('The owner should be able to add back multiple addresses to the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
-    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT, CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
 
     const whitelisted2 = await crowdsaleInstance.whitelist(CONTRIBUTOR_2_ACCOUNT);
     const whitelisted3 = await crowdsaleInstance.whitelist(CONTRIBUTOR_3_ACCOUNT);
@@ -149,60 +155,54 @@ contract('Crowdsale', async (accounts)=> {
   });
 
 
-  it('Only the owner should be able to add an address to the whitelist', async ()=> {
+  it('Only the owner should be able to add an address to the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     try {
       const transaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
       assert.equal(true, false);
-    } catch(error) {
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('The owner should be able to update the rate at which tokens are minted per wei sent in', async ()=> {
+  it('The owner should be able to update the rate at which tokens are minted per wei sent in', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
-      const updateRate = await crowdsaleInstance.updateRate(RATE, {from: OWNER_ACCOUNT});
-      const updatedRateBN = await crowdsaleInstance.rate.call();
-      const updatedRate = updatedRateBN.toNumber();
+    const updateRate = await crowdsaleInstance.updateRate(RATE, {from: OWNER_ACCOUNT});
+    const updatedRateBN = await crowdsaleInstance.rate.call();
+    const updatedRate = updatedRateBN.toNumber();
 
-      assert.equal(RATE, updatedRate);
+    assert.equal(RATE, updatedRate);
   });
 
-  it('The owner should not be able to update the rate more than 10 percent up', async ()=> {
+  it('The owner should not be able to update the rate more than 10 percent up', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
-
-      try {
-        const updateRate = await crowdsaleInstance.updateRate(RATE * 1.11, {from: OWNER_ACCOUNT});
-        assert.equal(true, false);
-      } catch(error){
-        assert(error);
-      }
+    return assert.isRejected(crowdsaleInstance.updateRate(RATE * 1.11, { from: OWNER_ACCOUNT }));
   });
 
-  it('The owner should not be able to update the rate more than 10 percent lower', async ()=> {
-    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
-
-      try {
-        const updateRate = await crowdsaleInstance.updateRate(RATE * .89, {from: OWNER_ACCOUNT});
-        assert.equal(true, false);
-      } catch(error){
-        assert(error);
-      }
-  });
-
-  it('Only the owner should be able to update the rate at which tokens are minted per wei sent in', async ()=> {
+  it('The owner should not be able to update the rate more than 10 percent lower', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
     try {
-      const transaction = await crowdsaleInstance.updateRate(RATE, {from: CONTRIBUTOR_2_ACCOUNT });
+      const updateRate = await crowdsaleInstance.updateRate(RATE * .89, {from: OWNER_ACCOUNT});
       assert.equal(true, false);
-    } catch(error) {
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('An address on the whitelist and purchasing in the first 2 days should get a 30 percent bonus', async ()=> {
+  it('Only the owner should be able to update the rate at which tokens are minted per wei sent in', async () => {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+    try {
+      const transaction = await crowdsaleInstance.updateRate(RATE, {from: CONTRIBUTOR_2_ACCOUNT});
+      assert.equal(true, false);
+    } catch (error) {
+      assert(error);
+    }
+  });
+
+  it('An address on the whitelist and purchasing in the first 2 days should get a 30 percent bonus', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
@@ -217,7 +217,10 @@ contract('Crowdsale', async (accounts)=> {
     const walletEthBalanceBefore = convertFromBnToInt(walletEthBalanceBeforeBN);
 
     // BUY TOKENS TRANSACTION
-    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT, value: etherInBn });
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_1_ACCOUNT, {
+      from: CONTRIBUTOR_1_ACCOUNT,
+      value: etherInBn
+    });
 
     // AFTER TRANSACTION
     // Get the balances of everything after the buy transaction
@@ -238,7 +241,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(walletEthBalanceBefore + 1, walletEthBalanceAfter);
   });
 
-  it('The owner should be able mint an initial amount and bonus for a whitelisted address', async ()=> {
+  it('The owner should be able mint an initial amount and bonus for a whitelisted address', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
@@ -262,7 +265,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(100000, vestedBonus);
   });
 
-  it('The owner should be able mint an initial amount and bonus for another whitelisted address', async ()=> {
+  it('The owner should be able mint an initial amount and bonus for another whitelisted address', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
@@ -286,7 +289,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(100000, vestedBonus);
   });
 
-  it('The owner should not be able mint an amount greater than what is available for the crowdsale', async ()=> {
+  it('The owner should not be able mint an amount greater than what is available for the crowdsale', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     //console.log(tokenInstance);
@@ -297,13 +300,13 @@ contract('Crowdsale', async (accounts)=> {
     try {
       const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_3, initialPurchase, initialBonus);
       assert(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
 
   });
 
-  it('The owner should be not be able to mint an initial amount and bonus for a whitelisted address that has a vesting schedule', async ()=> {
+  it('The owner should be not be able to mint an initial amount and bonus for a whitelisted address that has a vesting schedule', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
@@ -313,12 +316,12 @@ contract('Crowdsale', async (accounts)=> {
     try {
       const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, initialBonus);
       assert.equal(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('The owner should be not be able to mint an initial amount less than the minimum', async ()=> {
+  it('The owner should be not be able to mint an initial amount less than the minimum', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
@@ -328,12 +331,12 @@ contract('Crowdsale', async (accounts)=> {
     try {
       const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus);
       assert(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('The owner should be not be able to mint an initial amount greater than the maximum', async ()=> {
+  it('The owner should be not be able to mint an initial amount greater than the maximum', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     // 333000 is the min and 13.5 million is the max
@@ -343,12 +346,12 @@ contract('Crowdsale', async (accounts)=> {
     try {
       const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus);
       assert(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('The owner should be able to update the vesting schedule if there was an error', async ()=> {
+  it('The owner should be able to update the vesting schedule if there was an error', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     // originally 500000, and 100000
     const initialPurchase = convertEtherToWeiBN(400000);
@@ -378,7 +381,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(50000, vestingBonusAfter);
   });
 
-  it('Only the owner should be able to update the vesting schedule if there was an error', async ()=> {
+  it('Only the owner should be able to update the vesting schedule if there was an error', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     // originally 500000, and 100000
     const initialPurchase = convertEtherToWeiBN(400000);
@@ -387,12 +390,12 @@ contract('Crowdsale', async (accounts)=> {
     try {
       const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, initialBonus, {from: MINT_ACCOUNT_3});
       assert.equal(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('The owner should not be able to update a vesting schedule for an address that does not already have one', async ()=> {
+  it('The owner should not be able to update a vesting schedule for an address that does not already have one', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     // originally 500000, and 100000
     const initialPurchase = convertEtherToWeiBN(400000);
@@ -401,12 +404,12 @@ contract('Crowdsale', async (accounts)=> {
     try {
       const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_3, initialPurchase, initialBonus);
       assert.equal(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('The owner should be able to update the address of the owner of the token', async ()=> {
+  it('The owner should be able to update the address of the owner of the token', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -416,7 +419,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(MINT_ACCOUNT_3, tokenOwner);
   });
 
-  it('The new owner should be able to change the address token\'s owner back to the crowdsale contract', async ()=> {
+  it('The new owner should be able to change the address token\'s owner back to the crowdsale contract', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -426,7 +429,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(LightstreamCrowdsale.address, tokenOwner);
   });
 
-  it('An address on the whitelist and purchasing between day 3 and 4 should get a 20 percent bonus', async ()=> {
+  it('An address on the whitelist and purchasing between day 3 and 4 should get a 20 percent bonus', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
@@ -438,7 +441,10 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_2_ACCOUNT, {from: CONTRIBUTOR_2_ACCOUNT, value: etherInBn });
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_2_ACCOUNT, {
+      from: CONTRIBUTOR_2_ACCOUNT,
+      value: etherInBn
+    });
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
@@ -452,7 +458,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(200, vestedBonus);
   });
 
-  it('An address on the whitelist and purchasing between day 4 and 6 should get a 10 percent bonus', async ()=> {
+  it('An address on the whitelist and purchasing between day 4 and 6 should get a 10 percent bonus', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
@@ -464,7 +470,10 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_3_ACCOUNT, {from: CONTRIBUTOR_3_ACCOUNT, value: etherInBn });
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_3_ACCOUNT, {
+      from: CONTRIBUTOR_3_ACCOUNT,
+      value: etherInBn
+    });
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
@@ -478,7 +487,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(100, vestedBonus);
   });
 
-  it('An address on the whitelist and purchasing between day 6 and 8 should get a 5 percent bonus', async ()=> {
+  it('An address on the whitelist and purchasing between day 6 and 8 should get a 5 percent bonus', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
@@ -490,7 +499,10 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_4_ACCOUNT, {from: CONTRIBUTOR_4_ACCOUNT, value: etherInBn });
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_4_ACCOUNT, {
+      from: CONTRIBUTOR_4_ACCOUNT,
+      value: etherInBn
+    });
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
@@ -504,7 +516,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(50, vestedBonus);
   });
 
-  it('An address on the whitelist and purchasing after day 8 should not get a bonus', async ()=> {
+  it('An address on the whitelist and purchasing after day 8 should not get a bonus', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
@@ -516,7 +528,10 @@ contract('Crowdsale', async (accounts)=> {
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {from: CONTRIBUTOR_5_ACCOUNT, value: etherInBn });
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {
+      from: CONTRIBUTOR_5_ACCOUNT,
+      value: etherInBn
+    });
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
@@ -530,20 +545,23 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(0, vestedBonus);
   });
 
-  it('An address that has already purchased tokens should not be able to purchase again', async ()=> {
+  it('An address that has already purchased tokens should not be able to purchase again', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
 
     try {
-      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {from: CONTRIBUTOR_5_ACCOUNT, value: etherInBn });
+      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {
+        from: CONTRIBUTOR_5_ACCOUNT,
+        value: etherInBn
+      });
       assert.equal(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('The owner should be able to revoke a minted addresses vesting schedule if they do not pass KYC', async ()=> {
+  it('The owner should be able to revoke a minted addresses vesting schedule if they do not pass KYC', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -609,7 +627,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(revokedAmountDifference, bonusDifference + initialAmountDifference, 'revokedAmountDifference');
   });
 
-  it('The sale should close and whitelisted addresses should no longer be able to purchase tokens', async ()=> {
+  it('The sale should close and whitelisted addresses should no longer be able to purchase tokens', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
@@ -618,13 +636,16 @@ contract('Crowdsale', async (accounts)=> {
     const timeTravelTransaction = await timeTravel(3600 * 24 * 22);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
     try {
-      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_6_ACCOUNT, {from: CONTRIBUTOR_6_ACCOUNT, value: etherInBn });
-    } catch(error) {
+      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_6_ACCOUNT, {
+        from: CONTRIBUTOR_6_ACCOUNT,
+        value: etherInBn
+      });
+    } catch (error) {
       assert(error);
     }
   });
 
-  it('When finalize is called on the sales contract the team contract gets 135 million PTH', async ()=>{
+  it('When finalize is called on the sales contract the team contract gets 135 million PTH', async () => {
     const crowdsalesInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -638,7 +659,7 @@ contract('Crowdsale', async (accounts)=> {
 
 
   // 1 MONTH (ISH) AFTER PURCHASE
-  it('The first contributor should be able to release the 1/5th of their vested tokens after 30 days - Month 1', async ()=> {
+  it('The first contributor should be able to release the 1/5th of their vested tokens after 30 days - Month 1', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -652,7 +673,7 @@ contract('Crowdsale', async (accounts)=> {
     const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
@@ -671,9 +692,8 @@ contract('Crowdsale', async (accounts)=> {
   });
 
 
-
   // 30 DAYS LATER - 60 TOTAL
-  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 2', async ()=> {
+  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 2', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -692,7 +712,7 @@ contract('Crowdsale', async (accounts)=> {
 
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
@@ -710,7 +730,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(vestingBalanceBefore - vestingBalanceAfter, initialAmountClaimed);
   });
 
-  it('The owner should be able to revoke an address that purchased through the sale', async ()=> {
+  it('The owner should be able to revoke an address that purchased through the sale', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -777,7 +797,7 @@ contract('Crowdsale', async (accounts)=> {
   });
 
   // 30 DAYS LATER - 90 TOTAL
-  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 3', async ()=> {
+  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 3', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -796,7 +816,7 @@ contract('Crowdsale', async (accounts)=> {
 
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
@@ -815,7 +835,7 @@ contract('Crowdsale', async (accounts)=> {
   });
 
   // 30 DAYS LATER - 120 TOTAL
-  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 4', async ()=> {
+  it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 4', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -834,7 +854,7 @@ contract('Crowdsale', async (accounts)=> {
 
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
@@ -853,7 +873,7 @@ contract('Crowdsale', async (accounts)=> {
   });
 
   // 150 DAYS
-  it('The first contributor should be able to release all of their initial invested tokens', async ()=> {
+  it('The first contributor should be able to release all of their initial invested tokens', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -871,7 +891,7 @@ contract('Crowdsale', async (accounts)=> {
     const vestingAmountClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmountClaimed]);
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
@@ -893,7 +913,7 @@ contract('Crowdsale', async (accounts)=> {
   });
 
   // 180 DAYS - BONUS
-  it('The first contributor should be able to release the first part of their bonus', async ()=> {
+  it('The first contributor should be able to release the first part of their bonus', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -918,7 +938,7 @@ contract('Crowdsale', async (accounts)=> {
     const vestingBonusClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusClaimed]);
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     // CROWDSALE CONTRACT
@@ -949,8 +969,8 @@ contract('Crowdsale', async (accounts)=> {
   });
 
   // 210 DAYS - BONUS
-  it('The first contributor should be able to release the last part of their bonus', async ()=> {
-  const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+  it('The first contributor should be able to release the last part of their bonus', async () => {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
     // Time travel 1 month into the future
@@ -974,7 +994,7 @@ contract('Crowdsale', async (accounts)=> {
     const vestingBonusClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusClaimed]);
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     // CROWDSALE CONTRACT
@@ -1005,19 +1025,19 @@ contract('Crowdsale', async (accounts)=> {
   });
 
   // 210 DAYS - BONUS
-  it('The first contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async ()=> {
+  it('The first contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     try {
       // RELEASE
-      const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, { from: CONTRIBUTOR_1_ACCOUNT });
+      const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
       assert.equal(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
 
-    // 210 DAYS - BONUS
-  it('The second contributor should be able to release all of their initial amount and bonus', async ()=> {
+  // 210 DAYS - BONUS
+  it('The second contributor should be able to release all of their initial amount and bonus', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -1038,7 +1058,7 @@ contract('Crowdsale', async (accounts)=> {
     const vestingBonusClaimedBefore = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.bonusClaimed]);
 
     // RELEASE
-    const release = await crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, { from: CONTRIBUTOR_2_ACCOUNT });
+    const release = await crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, {from: CONTRIBUTOR_2_ACCOUNT});
 
     // GET BALANCES AFTER RELEASE
     // CROWDSALE CONTRACT
@@ -1069,14 +1089,14 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(bonusDifference, accountBalanceAfter - accountBalanceBefore - initialAmountClaimedDifference, 'bonusDifference');
   });
 
-    // 210 DAYS - BONUS
-  it('The second contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async ()=> {
+  // 210 DAYS - BONUS
+  it('The second contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     try {
       // RELEASE
-      const release = await crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, { from: CONTRIBUTOR_2_ACCOUNT });
+      const release = await crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, {from: CONTRIBUTOR_2_ACCOUNT});
       assert.equal(true, false);
-    } catch(error){
+    } catch (error) {
       assert(error);
     }
   });
