@@ -970,13 +970,9 @@ contract('Crowdsale', async (accounts) => {
   // 210 DAYS - BONUS
   it('The first contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
-    try {
-      // RELEASE
-      const release = await crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+    const vesting = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_1_ACCOUNT);
+
+    return assert.isRejected(crowdsaleInstance.release(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT}));
   });
 
   // 210 DAYS - BONUS
