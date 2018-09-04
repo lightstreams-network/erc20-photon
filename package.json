@@ -21,7 +21,7 @@
     "web3": "^1.0.0-beta.26"
   },
   "devDependencies": {
-    "chai-as-promised": "7.1.1",
+    "chai-as-promised": "^7.1.1",
     "truffle-privatekey-provider": "^0.1.0"
   }
 }

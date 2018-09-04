@@ -33,7 +33,7 @@ const mineBlock = function () {
 };
 
 const convertFromBnToInt = function(bn) {
-  return Number(web3._extend.utils.fromWei(bn.toNumber(), 'ether'));
+  return Number(web3.fromWei(bn.toNumber(), 'ether'));
 }
 
 
@@ -71,7 +71,7 @@ contract('LightstreamToken', async (accounts)=> {
   it('should deploy the token and store the address', async ()=> {
     const tokenInstance = await LightstreamToken.deployed();
 
-    assert(tokenInstance.address, 'Token address couldn\'t be stored');
+    assert.isDefined(tokenInstance.address, 'Token address couldn\'t be stored');
   });
 
   it('should transfer the ownership to the crowdsale contract', async ()=> {
@@ -100,7 +100,14 @@ contract('Team Distribution', async (accounts)=> {
   it('should deploy the Team Distribution contract and store the address', async ()=>{
     const teamDistributionInstance = await TeamDistribution.deployed();
 
-    assert(teamDistributionInstance.address, 'Token address couldn\'t be stored');
+    assert.isDefined(teamDistributionInstance.address, 'Token address couldn\'t be stored');
+  });
+
+  it('The owner can not create an allocation before the sale has been finalized and the contract has a balance of PHT in it', async ()=> {
+    const teamDistributionInstance = await TeamDistribution.deployed();
+    const PHT = web3.toWei('240', 'ether');
+
+    return assert.isRejected(teamDistributionInstance.setAllocation(TEAM_MEMEBER_ACCOUNT, PHT, TEAM_SUPPLY_ID));
   });
 
   it('When finalize is called on the sales contract the team contract gets 135 million PTH', async ()=>{
@@ -116,12 +123,12 @@ contract('Team Distribution', async (accounts)=> {
 
     const crowdsaleBalance = convertFromBnToInt(crowdsaleBalanceBN);
 
-    assert(crowdsaleBalance, 135000000);
+    assert.equal(crowdsaleBalance, 135000000);
   });
 
   it('The owner can create an allocation from the team supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei('240', 'ether');
+    const PHT = web3.toWei('240', 'ether');
 
     const teamSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_TEAM_SUPPLY.call();
 
@@ -146,7 +153,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can not create an allocation from the team supply greater than the amount allocated to it', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_TEAM_SUPPLY + 100, 'ether');
+    const PHT = web3.toWei(AVAILABLE_TEAM_SUPPLY + 100, 'ether');
 
     return assert.isRejected(teamDistributionInstance.setAllocation(SEED_INVESTOR_ACCOUNT, PHT, TEAM_SUPPLY_ID));
   });
@@ -168,7 +175,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can create an allocation from the seed investors supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei('500', 'ether');
+    const PHT = web3.toWei('500', 'ether');
 
     const seedInvestorSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_SEED_INVESTORS_SUPPLY.call();
     const grandTotalAllocatedBeforeBN = await teamDistributionInstance.grandTotalAllocated.call();
@@ -193,7 +200,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can not create an allocation from the seed investor supply greater than the amount allocated to it', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_SEED_INVESTORS_SUPPLY + 100, 'ether');
+    const PHT = web3.toWei(AVAILABLE_SEED_INVESTORS_SUPPLY + 100, 'ether');
 
     return assert.isRejected(teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, SEED_INVESTORS_SUPPLY_ID));
 
@@ -201,7 +208,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can create an allocation from the founders supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei('240', 'ether');
+    const PHT = web3.toWei('240', 'ether');
 
     const founderAllocationDataBefore = await teamDistributionInstance.allocations(FOUNDER_ACCOUNT);
 
@@ -224,7 +231,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can not create an allocation from the founders supply greater than the amount allocated to it', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_FOUNDERS_SUPPLY + 100, 'ether');
+    const PHT = web3.toWei(AVAILABLE_FOUNDERS_SUPPLY + 100, 'ether');
 
     return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, FOUNDERS_SUPPLY_ID));
 
@@ -234,7 +241,7 @@ contract('Team Distribution', async (accounts)=> {
   it('The owner can create an allocation from the advisors supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const tokenInstance = await LightstreamToken.deployed();
-    const PHT = web3._extend.utils.toWei('100', 'ether');
+    const PHT = web3.toWei('100', 'ether');
 
     const advisorsSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_ADVISORS_SUPPLY.call();
 
@@ -251,15 +258,15 @@ contract('Team Distribution', async (accounts)=> {
     const advisorAccountBalanceBN = await tokenInstance.balanceOf(ADVISOR_ACCOUNT);
     const advisorAccountBalance = convertFromBnToInt(advisorAccountBalanceBN);
 
-    assert.equal(AVAILABLE_ADVISORS_SUPPLY, advisorsSupplyBefore);
-    assert.equal(advisorAllocation, 100);
-    assert.equal(advisorAccountBalance, 100);
-    assert.equal(advisorsSupplyBefore - advisorAllocation, advisorsSupplyAfter);
+    assert.equal(AVAILABLE_ADVISORS_SUPPLY, advisorsSupplyBefore, 'advisorsSupplyBefore');
+    assert.equal(advisorAllocation, 100, 'advisorAllocation');
+    assert.equal(advisorAccountBalance, 100, 'advisorAccountBalance');
+    assert.equal(advisorsSupplyBefore - advisorAllocation, advisorsSupplyAfter, 'advisorsSupplyAfter');
   });
 
   it('The owner can not create an allocation from the advisors supply greater than the amount allocated to it', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_ADVISORS_SUPPLY + 1000, 'ether');
+    const PHT = web3.toWei(AVAILABLE_ADVISORS_SUPPLY + 1000, 'ether');
 
     return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, ADVISORS_SUPPLY_ID));
   });
@@ -267,7 +274,7 @@ contract('Team Distribution', async (accounts)=> {
   it('The owner can create an allocation from the consultants supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const tokenInstance = await LightstreamToken.deployed();
-    const PHT = web3._extend.utils.toWei('100', 'ether');
+    const PHT = web3.toWei('100', 'ether');
 
     const consultantSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_CONSULTANTS_SUPPLY.call();
 
@@ -284,15 +291,15 @@ contract('Team Distribution', async (accounts)=> {
     const consultantAccountBalanceBN = await tokenInstance.balanceOf(CONSULTANT_ACCOUNT);
     const consultantAccountBalance = convertFromBnToInt(consultantAccountBalanceBN);
 
-    assert.equal(AVAILABLE_CONSULTANTS_SUPPLY, consultantSupplyBefore);
-    assert.equal(consultantAllocation, 100);
-    assert.equal(consultantAccountBalance, 100);
-    assert.equal(consultantSupplyBefore - consultantAllocation, consultantSupplyAfter);
+    assert.equal(AVAILABLE_CONSULTANTS_SUPPLY, consultantSupplyBefore, 'AVAILABLE_CONSULTANTS_SUPPLY');
+    assert.equal(consultantAllocation, 100, 'consultantAllocation');
+    assert.equal(consultantAccountBalance, 100, 'consultantAccountBalance');
+    assert.equal(consultantSupplyBefore - consultantAllocation, consultantSupplyAfter, 'consultantSupplyAfter');
   });
 
   it('The owner can not create an allocation from the consultants supply greater than the amount allocated to it', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_CONSULTANTS_SUPPLY + 100, 'ether');
+    const PHT = web3.toWei(AVAILABLE_CONSULTANTS_SUPPLY + 100, 'ether');
 
     return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, CONSULTANTS_SUPPLY_ID));
   });
@@ -300,7 +307,7 @@ contract('Team Distribution', async (accounts)=> {
   it('The owner can create an allocation from the others supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const tokenInstance = await LightstreamToken.deployed();
-    const PHT = web3._extend.utils.toWei('100', 'ether');
+    const PHT = web3.toWei('100', 'ether');
 
     const otherSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_OTHER_SUPPLY.call();
 
@@ -317,16 +324,16 @@ contract('Team Distribution', async (accounts)=> {
     const otherAccountBalanceBN = await tokenInstance.balanceOf(OTHER_ACCOUNT);
     const otherAccountBalance = convertFromBnToInt(otherAccountBalanceBN);
 
-    assert.equal(AVAILABLE_OTHER_SUPPLY, otherSupplyBefore);
-    assert.equal(otherAllocation, 100);
-    assert.equal(otherAccountBalance, 100);
-    assert.equal(otherSupplyBefore - otherAllocation, otherSupplyAfter);
+    assert.equal(AVAILABLE_OTHER_SUPPLY, otherSupplyBefore, 'AVAILABLE_OTHER_SUPPLY');
+    assert.equal(otherAllocation, 100, 'otherAllocation');
+    assert.equal(otherAccountBalance, 100, 'otherAccountBalance');
+    assert.equal(otherSupplyBefore - otherAllocation, otherSupplyAfter, 'otherSupplyAfter');
   });
 
 
   it('The owner can not create an allocation from the other supply greater than the amount allocated to it', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const PHT = web3._extend.utils.toWei(AVAILABLE_OTHER_SUPPLY + 1000, 'ether');
+    const PHT = web3.toWei(AVAILABLE_OTHER_SUPPLY + 1000, 'ether');
 
     return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, CONSULTANTS_SUPPLY_ID));
   });

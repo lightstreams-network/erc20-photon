@@ -85,6 +85,12 @@ contract('Crowdsale', async (accounts) => {
     assert.equal(LightstreamCrowdsale.address, owner, 'The owner of the token was not updated to the crowdsale contact');
   });
 
+  it('should the owner should not be able to transfer the ownership of token now that it has been assigned to the sales contract', async () => {
+    const tokenInstance = await LightstreamToken.deployed();
+
+    return assert.isRejected(tokenInstance.transferOwnership(MINT_ACCOUNT_3));
+  });
+
   it('The owner should be able to add an address to the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
@@ -173,6 +179,7 @@ contract('Crowdsale', async (accounts) => {
 
   it('The owner should not be able to update the rate more than 10 percent up', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
     return assert.isRejected(crowdsaleInstance.updateRate(RATE * 1.11, { from: OWNER_ACCOUNT }));
   });
 
@@ -278,7 +285,7 @@ contract('Crowdsale', async (accounts) => {
   it('The owner should not be able mint an amount greater than what is available for the crowdsale', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
-    //console.log(tokenInstance);
+
     // 333000 is the min and 13.5 million is the max
     const initialPurchase = convertEtherToWeiBN(165000000);
     const initialBonus = convertEtherToWeiBN(100000);
@@ -395,16 +402,27 @@ contract('Crowdsale', async (accounts) => {
     const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
+    // BEFORE TRANSACTION
+    // Get the balance of the owner wallet before the buying tokens transaction
+    const walletEthBalanceBeforeBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceBefore = convertFromBnToInt(walletEthBalanceBeforeBN);
+
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
+    // BUY TOKENS
     const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_2_ACCOUNT, {
       from: CONTRIBUTOR_2_ACCOUNT,
       value: etherInBn
     });
+
+    // AFTER TRANSACTION
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
+    // ETH
+    const walletEthBalanceAfterBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceAfter = convertFromBnToInt(walletEthBalanceAfterBN);
     // Get the vesting schedule of the address
     const vestingSchedule = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_2_ACCOUNT);
     const vestedInitialAmount = convertFromBnToInt(vestingSchedule[VESTING_SCHEDULE.initialAmount]);
@@ -413,6 +431,8 @@ contract('Crowdsale', async (accounts) => {
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
     assert.equal(200, vestedBonus);
+    assert.equal(200, vestedBonus);
+    assert.equal(walletEthBalanceBefore + 1, walletEthBalanceAfter);
   });
 
   it('An address on the whitelist and purchasing between day 4 and 6 should get a 10 percent bonus', async () => {
@@ -424,13 +444,21 @@ contract('Crowdsale', async (accounts) => {
     const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
+    // BEFORE TRANSACTION
+    // Get the balance of the owner wallet before the buying tokens transaction
+    const walletEthBalanceBeforeBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceBefore = convertFromBnToInt(walletEthBalanceBeforeBN);
+
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
-    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_3_ACCOUNT, {
-      from: CONTRIBUTOR_3_ACCOUNT,
-      value: etherInBn
-    });
+    // BUY TOKENS
+    const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_3_ACCOUNT, {from: CONTRIBUTOR_3_ACCOUNT, value: etherInBn});
+
+    // AFTER TRANSACTION
+    // ETH
+    const walletEthBalanceAfterBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceAfter = convertFromBnToInt(walletEthBalanceAfterBN);
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
@@ -442,6 +470,7 @@ contract('Crowdsale', async (accounts) => {
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
     assert.equal(100, vestedBonus);
+    assert.equal(walletEthBalanceBefore + 1, walletEthBalanceAfter);
   });
 
   it('An address on the whitelist and purchasing between day 6 and 8 should get a 5 percent bonus', async () => {
@@ -453,13 +482,24 @@ contract('Crowdsale', async (accounts) => {
     const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
+    // BEFORE TRANSACTION
+    // Get the balance of the owner wallet before the buying tokens transaction
+    const walletEthBalanceBeforeBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceBefore = convertFromBnToInt(walletEthBalanceBeforeBN);
+    // Get the balance of PHT the crowd sales contract holds
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
+    // BUY TOKENS
     const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_4_ACCOUNT, {
       from: CONTRIBUTOR_4_ACCOUNT,
       value: etherInBn
     });
+
+    // AFTER TRANSACTION
+    // ETH
+    const walletEthBalanceAfterBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceAfter = convertFromBnToInt(walletEthBalanceAfterBN);
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
@@ -471,6 +511,7 @@ contract('Crowdsale', async (accounts) => {
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
     assert.equal(50, vestedBonus);
+    assert.equal(walletEthBalanceBefore + 1, walletEthBalanceAfter);
   });
 
   it('An address on the whitelist and purchasing after day 8 should not get a bonus', async () => {
@@ -482,13 +523,24 @@ contract('Crowdsale', async (accounts) => {
     const timeTravelTransaction = await timeTravel(3600 * 24 * 2);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
+    // BEFORE TRANSACTION
+    // Get the balance of the owner wallet before the buying tokens transaction
+    const walletEthBalanceBeforeBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceBefore = convertFromBnToInt(walletEthBalanceBeforeBN);
+
     const contractBalanceBeforeBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceBefore = convertFromBnToInt(contractBalanceBeforeBN);
 
+    // BUY TOKENS
     const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {
       from: CONTRIBUTOR_5_ACCOUNT,
       value: etherInBn
     });
+
+    // AFTER TRANSACTION
+    // ETH
+    const walletEthBalanceAfterBN = await web3.eth.getBalance(OWNER_ACCOUNT);
+    const walletEthBalanceAfter = convertFromBnToInt(walletEthBalanceAfterBN);
     // Get the balance of PHT the crowd sales contract holds
     const contractBalanceAfterBN = await tokenInstance.balanceOf(LightstreamCrowdsale.address);
     const contractBalanceAfter = convertFromBnToInt(contractBalanceAfterBN);
@@ -500,6 +552,7 @@ contract('Crowdsale', async (accounts) => {
     assert.equal(contractBalanceBefore + vestedInitialAmount + vestedBonus, contractBalanceAfter);
     assert.equal(1000, vestedInitialAmount);
     assert.equal(0, vestedBonus);
+    assert.equal(walletEthBalanceBefore + 1, walletEthBalanceAfter);
   });
 
   it('An address that has already purchased tokens should not be able to purchase again', async () => {
@@ -597,7 +650,7 @@ contract('Crowdsale', async (accounts) => {
 
     const crowdsaleBalance = convertFromBnToInt(crowdsaleBalanceBN);
 
-    assert(crowdsaleBalance, 135000000);
+    assert.equal(crowdsaleBalance, 135000000);
   });
 
 

@@ -84,12 +84,18 @@ contract TeamDistribution is Ownable {
    */
   function setAllocation (address _beneficiary, uint256 _totalAllocated, AllocationType _supply) onlyOwner public {
     // check to make sure the recipients address current allocation is zero and that the amount being allocated is greater than zero
-    require(_totalAllocated > 0);
+    require(_totalAllocated > 0, 'total allocated');
     // check to make sure the address exists so tokens don't get burnt
-    require(_beneficiary != address(0));
+    require(_beneficiary != address(0), 'no address');
     Allocation memory allocation = allocations[_beneficiary];
-    //prevent an allocation from being written over
-    require(allocation.startTimestamp == 0);
+    // prevent an allocation from being written over
+    require(allocation.startTimestamp == 0, 'start timestamp');
+
+    // prevent an allocation from being larger than the balance of the contract
+    ERC20 lightstreamToken = ERC20(token);
+    uint256 teamDistributionBalance = lightstreamToken.balanceOf(address(this));
+    require(teamDistributionBalance >= _totalAllocated, 'teamDistributionBalance');
+
     // TEAM
     if (_supply == AllocationType.TEAM) {
       require(_totalAllocated <= AVAILABLE_TEAM_SUPPLY);
@@ -214,7 +220,7 @@ contract TeamDistribution is Ownable {
   function refundTokens(address _recipient, address _token) public onlyOwner {
     require(_token != address(token));
     ERC20 refundToken = ERC20(_token);
-    uint256 balance = refundToken.balanceOf(this);
+    uint256 balance = refundToken.balanceOf(address(this));
     require(refundToken.transfer(_recipient, balance));
   }
 

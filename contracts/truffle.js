@@ -13,19 +13,21 @@
  */
 
 const PrivateKeyProvider = require('truffle-privatekey-provider');
+const HDWalletProvider = require('truffle-hdwallet-provider');
+const mnemonic = "pretty icon force payment fine toward artist rely mistake combine kick shiver";
 
 module.exports = {
   networks: {
     development: {
       host: 'localhost',
-      port: 9545,
+      port: 8545,
       network_id: '*',
       gas: 6721975
     },
     rinkeby: {
-      provider: function() {
+      provider: ()=> {
         // 4868546F8FDE76879690130D4FAAD3E8B043A0C79528BC04D5E15F9B4FD54FCD
-        return new PrivateKeyProvider('4868546F8FDE76879690130D4FAAD3E8B043A0C79528BC04D5E15F9B4FD54FCD', 'https://rinkeby.infura.io/Yqe59oKMsdh4CnwHxAyE')
+        return new HDWalletProvider(mnemonic, 'https://rinkeby.infura.io/Yqe59oKMsdh4CnwHxAyE', 0, 10)
       },
       network_id: 4,
       gas: 6721975
