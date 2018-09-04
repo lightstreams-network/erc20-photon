@@ -1,6 +1,9 @@
+const chai = require('chai')
 let LightstreamToken = artifacts.require("LightstreamToken");
 let TeamDistribution = artifacts.require("distribution/TeamDistribution");
 let LightstreamCrowdsale = artifacts.require("LightstreamCrowdsale");
+chai.use(require('chai-as-promised'))
+const assert = chai.assert;
 
 
 const timeTravel = function (time) {
@@ -145,40 +148,21 @@ contract('Team Distribution', async (accounts)=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const PHT = web3._extend.utils.toWei(AVAILABLE_TEAM_SUPPLY + 100, 'ether');
 
-    try {
-      const transaction = await teamDistributionInstance.setAllocation(SEED_INVESTOR_ACCOUNT, PHT, TEAM_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
-
+    return assert.isRejected(teamDistributionInstance.setAllocation(SEED_INVESTOR_ACCOUNT, PHT, TEAM_SUPPLY_ID));
   });
 
   it('The only the owner can create an allocation from the team supply', async ()=> {
-    try {
-      const teamDistributionInstance = await TeamDistribution.deployed();
-      const PHT = web3._extend.utils.toWei('240', 'ether');
+    const teamDistributionInstance = await TeamDistribution.deployed();
+    const PHT = web3.toWei(AVAILABLE_TEAM_SUPPLY + 100, 'ether');
 
-      const transaction = await teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, TEAM_SUPPLY_ID, {from: SEED_INVESTOR_ACCOUNT});
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, TEAM_SUPPLY_ID, {from: SEED_INVESTOR_ACCOUNT}));
   });
 
   it('The owner can not create an allocation for an address that already has an allocation', async ()=> {
-    try {
-      const teamDistributionInstance = await TeamDistribution.deployed();
-      const PHT = web3._extend.utils.toWei('240', 'ether');
+    const teamDistributionInstance = await TeamDistribution.deployed();
+    const PHT = web3.toWei(AVAILABLE_TEAM_SUPPLY + 100, 'ether');
 
-      const transaction = await teamDistributionInstance.setAllocation(TEAM_MEMEBER_ACCOUNT, PHT, TEAM_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.setAllocation(TEAM_MEMEBER_ACCOUNT, PHT, TEAM_SUPPLY_ID));
   });
 
 
@@ -211,13 +195,7 @@ contract('Team Distribution', async (accounts)=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const PHT = web3._extend.utils.toWei(AVAILABLE_SEED_INVESTORS_SUPPLY + 100, 'ether');
 
-    try {
-      const transaction = await teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, SEED_INVESTORS_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.setAllocation(FOUNDER_ACCOUNT, PHT, SEED_INVESTORS_SUPPLY_ID));
 
   });
 
@@ -248,13 +226,7 @@ contract('Team Distribution', async (accounts)=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const PHT = web3._extend.utils.toWei(AVAILABLE_FOUNDERS_SUPPLY + 100, 'ether');
 
-    try {
-      const transaction = await teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, FOUNDERS_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, FOUNDERS_SUPPLY_ID));
 
   });
 
@@ -289,13 +261,7 @@ contract('Team Distribution', async (accounts)=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const PHT = web3._extend.utils.toWei(AVAILABLE_ADVISORS_SUPPLY + 1000, 'ether');
 
-    try {
-      const transaction = await teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, ADVISORS_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, ADVISORS_SUPPLY_ID));
   });
 
   it('The owner can create an allocation from the consultants supply', async ()=> {
@@ -328,13 +294,7 @@ contract('Team Distribution', async (accounts)=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const PHT = web3._extend.utils.toWei(AVAILABLE_CONSULTANTS_SUPPLY + 100, 'ether');
 
-    try {
-      const transaction = await teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, CONSULTANTS_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, CONSULTANTS_SUPPLY_ID));
   });
 
   it('The owner can create an allocation from the others supply', async ()=> {
@@ -368,13 +328,7 @@ contract('Team Distribution', async (accounts)=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const PHT = web3._extend.utils.toWei(AVAILABLE_OTHER_SUPPLY + 1000, 'ether');
 
-    try {
-      const transaction = await teamDistributallocationDataAfterionInstance.setAllocation(NEW_ACCOUNT, PHT, CONSULTANTS_SUPPLY_ID);
-
-      assert(false, true);
-    } catch(error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.setAllocation(NEW_ACCOUNT, PHT, CONSULTANTS_SUPPLY_ID));
   });
 
   it('The team member can release their vested amount', async ()=> {
@@ -455,11 +409,7 @@ contract('Team Distribution', async (accounts)=> {
   it('The someone other than the team member can not release the vested amount', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
 
-    try {
-      const released = await teamDistributionInstance.release(TEAM_MEMEBER_ACCOUNT, {from: SEED_INVESTOR_ACCOUNT});
-    } catch (error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.release(TEAM_MEMEBER_ACCOUNT, {from: SEED_INVESTOR_ACCOUNT}));
   });
 
   it('The the owner can revoke a seed investor\'s vesting', async ()=> {
@@ -556,11 +506,7 @@ contract('Team Distribution', async (accounts)=> {
   it('The only the owner can revoke a team member\'s vesting', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
 
-    try {
-      const released = await teamDistributionInstance.revokeAllocation(accounts[2], {from: accounts[3]});
-    } catch (error){
-      assert(error);
-    }
+    return assert.isRejected(teamDistributionInstance.revokeAllocation(accounts[2], {from: accounts[3]}));
   });
 
 });

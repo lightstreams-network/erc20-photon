@@ -157,12 +157,8 @@ contract('Crowdsale', async (accounts) => {
 
   it('Only the owner should be able to add an address to the whitelist', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
-    try {
-      const transaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT});
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+
+    return assert.isRejected(crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT, {from: CONTRIBUTOR_1_ACCOUNT}));
   });
 
   it('The owner should be able to update the rate at which tokens are minted per wei sent in', async () => {
@@ -183,23 +179,13 @@ contract('Crowdsale', async (accounts) => {
   it('The owner should not be able to update the rate more than 10 percent lower', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
-    try {
-      const updateRate = await crowdsaleInstance.updateRate(RATE * .89, {from: OWNER_ACCOUNT});
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+    return assert.isRejected(crowdsaleInstance.updateRate(RATE * .89, {from: OWNER_ACCOUNT}));
   });
 
   it('Only the owner should be able to update the rate at which tokens are minted per wei sent in', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
-    try {
-      const transaction = await crowdsaleInstance.updateRate(RATE, {from: CONTRIBUTOR_2_ACCOUNT});
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+    return assert.isRejected(crowdsaleInstance.updateRate(RATE, {from: CONTRIBUTOR_2_ACCOUNT}));
   });
 
   it('An address on the whitelist and purchasing in the first 2 days should get a 30 percent bonus', async () => {
@@ -297,13 +283,7 @@ contract('Crowdsale', async (accounts) => {
     const initialPurchase = convertEtherToWeiBN(165000000);
     const initialBonus = convertEtherToWeiBN(100000);
 
-    try {
-      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_3, initialPurchase, initialBonus);
-      assert(true, false);
-    } catch (error) {
-      assert(error);
-    }
-
+    return assert.isRejected(crowdsaleInstance.mintAndVest(MINT_ACCOUNT_3, initialPurchase, initialBonus));
   });
 
   it('The owner should be not be able to mint an initial amount and bonus for a whitelisted address that has a vesting schedule', async () => {
@@ -313,12 +293,7 @@ contract('Crowdsale', async (accounts) => {
     const initialPurchase = convertEtherToWeiBN(500000);
     const initialBonus = convertEtherToWeiBN(100000);
 
-    try {
-      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, initialBonus);
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+    return assert.isRejected(crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, initialBonus));
   });
 
   it('The owner should be not be able to mint an initial amount less than the minimum', async () => {
@@ -328,12 +303,8 @@ contract('Crowdsale', async (accounts) => {
     const initialPurchase = convertEtherToWeiBN(300000);
     const initialBonus = convertEtherToWeiBN(100000);
 
-    try {
-      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus);
-      assert(true, false);
-    } catch (error) {
-      assert(error);
-    }
+
+    return assert.isRejected(crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus));
   });
 
   it('The owner should be not be able to mint an initial amount greater than the maximum', async () => {
@@ -343,12 +314,7 @@ contract('Crowdsale', async (accounts) => {
     const initialPurchase = convertEtherToWeiBN(14000000);
     const initialBonus = convertEtherToWeiBN(100000);
 
-    try {
-      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus);
-      assert(true, false);
-    } catch (error) {
-      assert(error);
-    }
+    return assert.isRejected(crowdsaleInstance.mintAndVest(MINT_ACCOUNT_2, initialPurchase, initialBonus));
   });
 
   it('The owner should be able to update the vesting schedule if there was an error', async () => {
@@ -387,12 +353,8 @@ contract('Crowdsale', async (accounts) => {
     const initialPurchase = convertEtherToWeiBN(400000);
     const initialBonus = convertEtherToWeiBN(50000);
 
-    try {
-      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, initialBonus, {from: MINT_ACCOUNT_3});
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+
+    return assert.isRejected(crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_1, initialPurchase, initialBonus, {from: MINT_ACCOUNT_3}));
   });
 
   it('The owner should not be able to update a vesting schedule for an address that does not already have one', async () => {
@@ -401,12 +363,7 @@ contract('Crowdsale', async (accounts) => {
     const initialPurchase = convertEtherToWeiBN(400000);
     const initialBonus = convertEtherToWeiBN(50000);
 
-    try {
-      const updateVestingSchedule = await crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_3, initialPurchase, initialBonus);
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+    return assert.isRejected(crowdsaleInstance.updateVestingSchedule(MINT_ACCOUNT_3, initialPurchase, initialBonus));
   });
 
   it('The owner should be able to update the address of the owner of the token', async () => {
@@ -550,15 +507,7 @@ contract('Crowdsale', async (accounts) => {
     const tokenInstance = await LightstreamToken.deployed();
     const etherInBn = convertEtherToWeiBN(1);
 
-    try {
-      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {
-        from: CONTRIBUTOR_5_ACCOUNT,
-        value: etherInBn
-      });
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+    return assert.isRejected(crowdsaleInstance.buyTokens(CONTRIBUTOR_5_ACCOUNT, {from: CONTRIBUTOR_5_ACCOUNT, value: etherInBn}));
   });
 
   it('The owner should be able to revoke a minted addresses vesting schedule if they do not pass KYC', async () => {
@@ -635,14 +584,8 @@ contract('Crowdsale', async (accounts) => {
     // Time travel 22 days into the future so the sale has ended
     const timeTravelTransaction = await timeTravel(3600 * 24 * 22);
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
-    try {
-      const buyTokens = await crowdsaleInstance.buyTokens(CONTRIBUTOR_6_ACCOUNT, {
-        from: CONTRIBUTOR_6_ACCOUNT,
-        value: etherInBn
-      });
-    } catch (error) {
-      assert(error);
-    }
+
+    return assert.isRejected(crowdsaleInstance.buyTokens(CONTRIBUTOR_6_ACCOUNT, {from: CONTRIBUTOR_6_ACCOUNT, value: etherInBn}));
   });
 
   it('When finalize is called on the sales contract the team contract gets 135 million PTH', async () => {
@@ -1092,13 +1035,8 @@ contract('Crowdsale', async (accounts) => {
   // 210 DAYS - BONUS
   it('The second contributor should not be able to release any more tokens after both initial amount and bonuses have been released', async () => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
-    try {
-      // RELEASE
-      const release = await crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, {from: CONTRIBUTOR_2_ACCOUNT});
-      assert.equal(true, false);
-    } catch (error) {
-      assert(error);
-    }
+
+    return assert.isRejected(crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, {from: CONTRIBUTOR_2_ACCOUNT}));
   });
 
 });

@@ -85,7 +85,7 @@ contract MonthlyVestingWithBonus is Ownable {
    * @param _beneficiary The address of the recipient of vested tokens
    */
   function release(address _beneficiary) public returns(uint){
-    require(vestingSchedules[_beneficiary].initialBalance > 0 || vestingSchedules[_beneficiary].initialBonus > 0);
+    require(vestingSchedules[_beneficiary].initialBalance > 0 || vestingSchedules[_beneficiary].bonusBalance > 0);
     require(msg.sender == _beneficiary);
 
     VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
@@ -103,7 +103,7 @@ contract MonthlyVestingWithBonus is Ownable {
       emit Released(_beneficiary, releasable);
     }
 
-    if (now > vestingSchedule.endTimestamp && vestingSchedule.initialBonus > 0) {
+    if (now > vestingSchedule.endTimestamp && vestingSchedule.bonusBalance > 0) {
       uint256 withdrawableBonus = calculateBonusWithdrawal(vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount, vestingSchedule.initialBonus);
 
       if(withdrawableBonus > 0) {

@@ -2,3 +2,4 @@ node_modules
 contracts/build/
 .idea
 .idea/workspace.xml
+package-lock.json
