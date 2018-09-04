@@ -102,9 +102,8 @@ contract('Crowdsale', async (accounts) => {
 
     assert.equal(whitelisted, false, 'Address not added to whitelist');
 
-    const addTransaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
-
-
+    // add back to whitelist
+    return crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
   });
 
   it('The owner should be able to add multiple addresses to the whitelist', async () => {
