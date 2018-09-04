@@ -74,8 +74,7 @@ contract('Crowdsale', async (accounts) => {
 
   it('should deploy the token and store the address', async () => {
     const tokenInstance = await LightstreamToken.deployed();
-
-    assert(tokenInstance.address, 'Token address couldn\'t be stored');
+    assert.isDefined(tokenInstance.address, 'Token address couldn\'t be stored');
   });
 
   it('should transfer the ownership of token to the crowdsale contract so it can mint tokens', async () => {
@@ -90,9 +89,9 @@ contract('Crowdsale', async (accounts) => {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
 
     const transaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
-    const whitelisted = await crowdsaleInstance.whitelist(CONTRIBUTOR_1_ACCOUNT)
+    const whitelisted = await crowdsaleInstance.whitelist(CONTRIBUTOR_1_ACCOUNT);
 
-    assert(whitelisted, 'Address not added to whitelist');
+    assert.isTrue(whitelisted, 'Address not added to whitelist');
   });
 
   it('The owner should be able to remove an address from the whitelist', async () => {
@@ -104,6 +103,8 @@ contract('Crowdsale', async (accounts) => {
     assert.equal(whitelisted, false, 'Address not added to whitelist');
 
     const addTransaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
+
+
   });
 
   it('The owner should be able to add multiple addresses to the whitelist', async () => {
