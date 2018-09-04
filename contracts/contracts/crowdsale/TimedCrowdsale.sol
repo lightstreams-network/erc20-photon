@@ -15,8 +15,6 @@ contract TimedCrowdsale is Crowdsale {
   uint256 public openingTime;
   uint256 public closingTime;
 
-  event LogInt(string _string, uint _uint);
-
   /**
    * @dev Reverts if not in crowdsale time range.
    */
@@ -46,8 +44,6 @@ contract TimedCrowdsale is Crowdsale {
    */
   function hasClosed() public returns (bool) {
     // solium-disable-next-line security/no-block-members
-    emit LogInt('block.timestamp', block.timestamp);
-    emit LogInt('closingTime', closingTime);
     return now > closingTime;
   }
 

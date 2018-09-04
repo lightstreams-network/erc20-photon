@@ -5,15 +5,13 @@ import "./Crowdsale.sol";
 
 
 /**
- * @title CappedCrowdsale
- * @dev Crowdsale with a limit for total contributions.
+ * @title TokenCappedCrowdsale
+ * @dev Crowdsale with a limit for the amount of tokens that can be sold
  */
 contract TokenCappedCrowdsale is Crowdsale {
   using SafeMath for uint256;
 
   uint256 public tokenCap;
-
-  event LogUint(string _type, uint256 _tokensPurchasing);
 
   /**
    * @dev Constructor, takes maximum amount of tokens sold in the crowdsale
@@ -45,7 +43,19 @@ contract TokenCappedCrowdsale is Crowdsale {
   {
     super._preValidatePurchase(_beneficiary, _weiAmount);
     uint256 tokensPurchasing = super._getTokenAmount(_weiAmount);
-    require(tokensSold.add(tokensPurchasing) <= tokenCap);
+    require(tokensSold.add(tokensPurchasing) <= tokenCap, 'tokenCap');
   }
+
+  function _preValidateMintAndVest(
+    address _beneficiary,
+    uint256 _tokens,
+    uint256 _bonus
+  )
+  internal
+  {
+    super._preValidateMintAndVest(_beneficiary, _tokens, _bonus);
+    require(tokensSold.add(_tokens).add(_bonus) <= tokenCap, 'tokenCap');
+  }
+
 
 }

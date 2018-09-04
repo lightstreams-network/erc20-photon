@@ -5,7 +5,7 @@ import "../token/SafeERC20.sol";
 import "../token/MintableToken.sol";
 import "../utils/SafeMath.sol";
 import "../utils/Ownable.sol";
-import "../escrow/TokenEscrow.sol";
+import "../distribution/MonthlyVestingWithBonus.sol";
 import "../lifecycle/Pausable.sol";
 import "../LightstreamToken.sol";
 
@@ -23,7 +23,7 @@ import "../LightstreamToken.sol";
  * behavior.
  */
 
-contract Crowdsale is Ownable, TokenEscrow, Pausable {
+contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
@@ -48,10 +48,9 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   uint256 public tokensSold;
 
   uint256 private constant decimalFactor = 10 ** uint256(18);
-  uint256 private constant INITIAL_SUPPLY_MAX =   13500000 * decimalFactor; // Max amount that can be minted approximately 2 million USD if sold at .15
-  uint256 private constant INITIAL_SUPPLY_MIN =     330000 * decimalFactor; // Min amount that can be minted approximately 50,000 USD if sold at .15
-  uint256 private constant BONUS_MAX          =    5400000 * decimalFactor; //
-  uint256 private constant BONUS_MIN          =          0;                 // Min amount that can be minted approximately 50,000 USD if sold at .15
+  uint256 private constant INITIAL_MINT_MAX =   13500000 * decimalFactor; // Max amount that can be minted approximately 2 million USD if sold at .15
+  uint256 private constant INITIAL_MINT_MIN =      330000 * decimalFactor; // Min amount that can be minted approximately 50,000 USD if sold at .15
+  uint256 private constant BONUS_MIN =                  0;                 // Min amount that can be minted approximately 50,000 USD if sold at .15
 
   /**
    * Event for token purchase logging
@@ -78,9 +77,6 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
     uint256 tokens,
     uint256 bonus
   );
-
-  event LogAddress(string _type, address _address);
-  event LogInt(string _type, uint _int);
 
   /**
    * @param _rate Number of token units a buyer gets per wei
@@ -110,13 +106,6 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
     buyTokens(msg.sender);
   }
 
-  function returnNow() public returns(uint256) {
-    return now;
-  }
-
-  function returnTimestamp() public returns(uint256) {
-    return block.timestamp;
-  }
   /**
    * @dev low level token purchase ***DO NOT OVERRIDE***
    * @param _beneficiary Address performing the token purchase
@@ -126,17 +115,11 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
 
     uint256 weiAmount = msg.value;
 
-    emit LogInt('weiAmount', weiAmount);
-    emit LogAddress('_beneficiary', _beneficiary);
-
     _preValidatePurchase(_beneficiary, weiAmount);
 
     // calculate token amount to be created
     uint256 tokens = _getTokenAmount(weiAmount);
     uint256 bonus =  _getBonus(tokens);
-
-    emit LogInt('tokens', tokens);
-    emit LogInt('bonus', bonus);
 
     // update state
     weiRaised = weiRaised.add(weiAmount);
@@ -151,18 +134,14 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
       tokens
     );
 
-    _updatePurchasingState(_beneficiary, weiAmount);
-
     _forwardFunds();
-    _postValidatePurchase(_beneficiary, weiAmount);
   }
 
   /**
- * @dev low level token purchase ***DO NOT OVERRIDE***
- * @param _beneficiary Address minting the tokens for
- * @param _tokens number fo PTH to be minted 1 PTH = 1000000000000000000
- * @param _bonus number fo PTH to be minted 1 PTH = 1000000000000000000
- */
+  * @param _beneficiary Address minting the tokens for
+  * @param _tokens number fo PTH to be minted 1 PTH = 1000000000000000000
+  * @param _bonus number fo PTH to be minted  1 PTH = 1000000000000000000
+  */
   function mintAndVest(address _beneficiary, uint256 _tokens, uint256 _bonus) public onlyOwner {
     require(vestingSchedules[_beneficiary].startTimestamp == 0);
 
@@ -180,26 +159,10 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
     );
   }
 
-  function mintAndEscrow(address _beneficiary, uint256 _tokens, uint256 _bonus) public onlyOwner {
-    _preValidateMintAndVest(_beneficiary, _tokens, _bonus);
-
-    // update state
-    tokensSold = tokensSold.add(_tokens).add(_bonus);
-
-    _processEscrow(_beneficiary, _tokens, _bonus);
-
-    emit TokensMintedAndVested(
-      _beneficiary,
-      _tokens,
-      _bonus
-    );
-  }
-
   /**
    * @dev updates the number of PTH given per wei. It will not allow a change over 10 percent of the current rate
    * @param _newRate number of PTH given per wei
    */
-
   function updateRate(uint16 _newRate) public onlyOwner {
     uint256 lowestRate = SafeMath.div(
       SafeMath.mul(rate, 9),
@@ -217,24 +180,29 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   }
 
   /**
-   * @dev sets the bonus rate for the address
-   * @param _address number of PTH given per wei
-   * @param _bonus an integer with from 1 to 10000.
-   * 1 =        .01 percent bonus
-   * 10 =       .10 percent bonus
-   * 100 =     1.00 percent bonus
-   * 1000 =   10.00 percent bonus
-   * 10000 = 100.00 percent bonus
+   * @dev Allows transfer of accidentally sent ERC20 tokens to contract
+   * @param _recipient address of recipient to receive ERC20 token
+   * @param _token address ERC20 token to transfer
    */
-
-  function setBonus(address _address, uint256 _bonus) public onlyOwner {
-    require(_bonus >= 1500 && _bonus <= 4000);
-    bonuses[_address] = _bonus;
+  function refundTokens(address _recipient, address _token) public onlyOwner {
+    require(_token != address(token));
+    ERC20 refundToken = ERC20(_token);
+    uint256 balance = refundToken.balanceOf(this);
+    require(refundToken.transfer(_recipient, balance));
   }
 
-  function getBonus(address _address) public onlyOwner returns(uint256 _bonus){
-    return bonuses[_address];
+  /**
+   * @dev The sales contract needs to be made the owner of the token in order to mint tokens. If the owner
+   * of the token needs to be updated it will have to come from the sales contract.  This was another contract
+   * could be added later for second sale
+   * @param _newOwnerAddress address of contract or wallet that will become owner of token giving it minting privileges
+   */
+  function updateTokenOwner(address _newOwnerAddress) public onlyOwner {
+    require(_newOwnerAddress != address(0));
+    LightstreamToken lightstreamToken = LightstreamToken(token);
+    lightstreamToken.transferOwnership(_newOwnerAddress);
   }
+
 
   // -----------------------------------------
   // Internal interface (extensible)
@@ -271,23 +239,13 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
   )
   internal
   {
-    require(_tokens >= INITIAL_SUPPLY_MIN && _tokens <= INITIAL_SUPPLY_MAX);
-    require(_bonus >= BONUS_MIN && _bonus <= BONUS_MAX);
+    uint256 bonusMax = SafeMath.div(
+        SafeMath.mul(_tokens, 40),
+        100
+      );
+    require(_tokens >= INITIAL_MINT_MIN && _tokens <= INITIAL_MINT_MAX);
+    require(_bonus >= BONUS_MIN && _bonus <= bonusMax);
     require(_bonus <= _tokens);
-  }
-
-  /**
-   * @dev Validation of an executed purchase. Observe state and use revert statements to undo rollback when valid conditions are not met.
-   * @param _beneficiary Address performing the token purchase
-   * @param _weiAmount Value in wei involved in the purchase
-   */
-  function _postValidatePurchase(
-    address _beneficiary,
-    uint256 _weiAmount
-  )
-  internal
-  {
-
   }
 
   /**
@@ -310,33 +268,17 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    * @param _tokensPurchased Number of tokens to be purchased
    * @param _bonus Number of tokens awarded as a bonus
    */
-  function _processPurchase(address _beneficiary, uint256 _tokensPurchased, uint _bonus) internal {
+  function _processPurchase(
+    address _beneficiary,
+    uint256 _tokensPurchased,
+    uint _bonus
+  )
+  internal
+  {
     uint256 totalTokens = _tokensPurchased.add(_bonus);
     _deliverTokens(address(this), totalTokens);
 
     setVestingSchedule(_beneficiary, _tokensPurchased, _bonus);
-  }
-
-
-  function _processEscrow(address _beneficiary, uint256 _tokensPurchased, uint _bonus) internal {
-    uint256 totalTokens = _tokensPurchased.add(_bonus);
-    _deliverTokens(_beneficiary, totalTokens);
-
-    createEscrow(_beneficiary, _tokensPurchased, _bonus);
-  }
-
-  /**
-   * @dev Override for extensions that require an internal state to check for validity (current user contributions, etc.)
-   * @param _beneficiary Address receiving the tokens
-   * @param _weiAmount Value in wei involved in the purchase
-   */
-  function _updatePurchasingState(
-    address _beneficiary,
-    uint256 _weiAmount
-  )
-  internal
-  {
-    // optional override
   }
 
   /**
@@ -344,8 +286,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    * @param _weiAmount Value in wei to be converted into tokens
    * @return Number of tokens that can be purchased with the specified _weiAmount
    */
-  function _getTokenAmount(uint256 _weiAmount)
-  internal view returns (uint256)
+  function _getTokenAmount(uint256 _weiAmount) internal view returns (uint256)
   {
     return _weiAmount.mul(rate);
   }
@@ -355,9 +296,7 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
    * @dev Override to extend the way in which ether is converted to tokens.
    * @return Number of tokens that the investor is entitled to based on bonus
    */
-  function _getBonus(uint256 _tokens)
-  internal returns (uint256 _bonus)
-  {
+  function _getBonus(uint256 _tokens) internal returns (uint256 _bonus) {
     uint256 bonus = 0;
     // If within days 0 - 2 contributor gets a 30 percent bonus
     if(now >= openingTime && now < openingTime + 2 days) {
@@ -385,30 +324,13 @@ contract Crowdsale is Ownable, TokenEscrow, Pausable {
       );
     }
 
-    emit LogInt('bonus', bonus);
     return bonus;
   }
-
 
   /**
    * @dev Determines how ETH is stored/forwarded on purchases.
    */
   function _forwardFunds() internal {
     wallet.transfer(msg.value);
-  }
-
-  // Allow transfer of accidentally sent ERC20 tokens
-  function refundTokens(address _recipient, address _token) public onlyOwner {
-    require(_token != address(token));
-    ERC20 refundToken = ERC20(_token);
-    uint256 balance = refundToken.balanceOf(this);
-    require(refundToken.transfer(_recipient, balance));
-  }
-
-  // Update Token Owner Address
-  function updateTokenOwner(address _newOwnerAddress) public onlyOwner {
-    require(_newOwnerAddress != address(0));
-    LightstreamToken lightstreamToken = LightstreamToken(token);
-    lightstreamToken.transferOwnership(_newOwnerAddress);
   }
 }

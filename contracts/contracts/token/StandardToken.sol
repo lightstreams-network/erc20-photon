@@ -56,7 +56,7 @@ contract StandardToken is ERC20 {
   }
 
   /**
-  * @dev Transfer token for a specified address
+  * @dev Transfer token for a specified address.
   * @param _to The address to transfer to.
   * @param _value The amount to be transferred.
   */

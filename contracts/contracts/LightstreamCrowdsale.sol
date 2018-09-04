@@ -3,7 +3,6 @@ pragma solidity ^0.4.24;
 import "./crowdsale/TokenCappedCrowdsale.sol";
 import "./crowdsale/FinalizableCrowdsale.sol";
 import "./distribution/MonthlyVestingWithBonus.sol";
-import "./escrow/TokenEscrow.sol";
 import "./crowdsale/MintedCrowdsale.sol";
 import "./crowdsale/TimedCrowdsale.sol";
 import "./crowdsale/WhitelistedCrowdsale.sol";
@@ -15,7 +14,7 @@ import "./token/MintableToken.sol";
  * @title LightstreamCrowdsale
  * The way to add new features to a base crowdsale is by multiple inheritance.
  * In this example we are providing following extensions:
- * TimedCrowdsale -
+ * TimedCrowdsale - set the start and end time for the sale
  * TokenCappedCrowdsale - sets a max boundary for the number of tokens minted
  * MintedCrowdsale - Creates tokens as the are sold in the sale
  * WhitelistedCrowdsale - only whitelisted addresses are allowed to purchase
@@ -25,7 +24,7 @@ import "./token/MintableToken.sol";
  */
 
 
-contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, MintedCrowdsale, WhitelistedCrowdsale, FinalizableCrowdsale {
+contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, FinalizableCrowdsale, MintedCrowdsale, WhitelistedCrowdsale {
 
   // Token Distribution
   // =============================
@@ -49,12 +48,13 @@ contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, MintedCro
   )
   public
   Crowdsale(initialRate, _wallet, _token, _openingTime)
+  MonthlyVestingWithBonus(_token)
   TimedCrowdsale(_openingTime, _closingTime)
   TokenCappedCrowdsale(tokensForSale)
-  MonthlyVestingWithBonus(_token)
-  TokenEscrow(_token, _wallet)
+  FinalizableCrowdsale()
+  MintedCrowdsale()
   WhitelistedCrowdsale()
-  FinalizableCrowdsale() {
+  {
     distributionContract = _distributionContract;
     token = _token;
   }

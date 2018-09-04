@@ -108,10 +108,6 @@ contract('Team Distribution', async (accounts)=> {
     const timeTravelTransaction = await timeTravel(3600 * 24 * 32); // Travel 32 days into the future so sale has finished
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
 
-    const closingTime = await crowdsalesInstance.closingTime.call();
-    const hasClosed = await crowdsalesInstance.hasClosed.call();
-    const returnTimestamp = await crowdsalesInstance.returnTimestamp.call();
-
     const finalize = await crowdsalesInstance.finalize({from: OWNER_ACCOUNT});
     const crowdsaleBalanceBN = await tokenInstance.balanceOf(TeamDistribution.address);
 
@@ -381,7 +377,7 @@ contract('Team Distribution', async (accounts)=> {
     }
   });
 
-  it('The team memeber can release their vested amount', async ()=> {
+  it('The team member can release their vested amount', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -392,15 +388,15 @@ contract('Team Distribution', async (accounts)=> {
     const balanceBeforeRelease = convertFromBnToInt(allocationDataBefore[6]);
     // Team member call function to release the vested amount to their wallet
     const released = await teamDistributionInstance.release(TEAM_MEMEBER_ACCOUNT, {from: TEAM_MEMEBER_ACCOUNT});
-    // Check the token for the balance of the team memeber's account
+    // Check the token for the balance of the team member's account
     const teamMemeberAccountBalanceBN = await tokenInstance.balanceOf(TEAM_MEMEBER_ACCOUNT);
     const teamMemeberAccountBalance = convertFromBnToInt(teamMemeberAccountBalanceBN);
-    // Get the team memember's updated allocation data after vesting
+    // Get the team member's updated allocation data after vesting
     const allocationDataAfter = await teamDistributionInstance.allocations(TEAM_MEMEBER_ACCOUNT);
     const balanceAfterRelease = convertFromBnToInt(allocationDataAfter[ALLOCATION.balance]);
     const amountClaimedAfterRelease = convertFromBnToInt(allocationDataAfter[ALLOCATION.amountClaimed]);
 
-    // team memeber allocation was originally 240 if 3 months pass they
+    // team member allocation was originally 240 if 3 months pass they
     // should be allowed to withdraw 30 PTH
     assert.equal(teamMemeberAccountBalance, 30);
     assert.equal(amountClaimedAfterRelease, 30);
@@ -456,10 +452,9 @@ contract('Team Distribution', async (accounts)=> {
 
   });
 
-  it('The someone other than the team memeber can not release the vested amount', async ()=> {
+  it('The someone other than the team member can not release the vested amount', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
 
-    const nowBefore = await teamDistributionInstance.returnNow.call();
     try {
       const released = await teamDistributionInstance.release(TEAM_MEMEBER_ACCOUNT, {from: SEED_INVESTOR_ACCOUNT});
     } catch (error){
@@ -503,7 +498,7 @@ contract('Team Distribution', async (accounts)=> {
     assert.equal(otherBalanceBefore + addedToOtherBalance, otherBalanceAfter);
   });
 
-  it('The team memeber can release all their vested funds when the vesting time is complete', async ()=> {
+  it('The team member can release all their vested funds when the vesting time is complete', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
     const tokenInstance = await LightstreamToken.deployed();
 
@@ -525,7 +520,7 @@ contract('Team Distribution', async (accounts)=> {
     const allocationBalanceAfterRelease = convertFromBnToInt(allocationDataAfter[ALLOCATION.balance]);
     const amountClaimedAfterRelease = convertFromBnToInt(allocationDataAfter[ALLOCATION.amountClaimed]);
 
-    // team memeber allocation was originally 240 PTH
+    // team member allocation was originally 240 PTH
     assert.equal(teamMemeberAccountBalanceAfter, 240);
     assert.equal(amountClaimedAfterRelease, 240);
     assert.equal(allocationBalanceAfterRelease, 0);
@@ -550,7 +545,7 @@ contract('Team Distribution', async (accounts)=> {
     const allocationBalanceAfterRelease = convertFromBnToInt(allocationDataAfter[ALLOCATION.balance]);
     const amountClaimedAfterRelease = convertFromBnToInt(allocationDataAfter[ALLOCATION.amountClaimed]);
 
-    // team memeber allocation was originally 240 PTH
+    // team member allocation was originally 240 PTH
     assert.equal(accountBalanceAfter, 240);
     assert.equal(amountClaimedAfterRelease, 240);
     assert.equal(allocationBalanceAfterRelease, 0);
@@ -558,10 +553,9 @@ contract('Team Distribution', async (accounts)=> {
   });
 
 
-  it('The only the owner can revoke a team memeber\'s vesting', async ()=> {
+  it('The only the owner can revoke a team member\'s vesting', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
 
-    const nowBefore = await teamDistributionInstance.returnNow.call();
     try {
       const released = await teamDistributionInstance.revokeAllocation(accounts[2], {from: accounts[3]});
     } catch (error){

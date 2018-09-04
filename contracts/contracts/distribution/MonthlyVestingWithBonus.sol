@@ -7,9 +7,8 @@ import '../utils/SafeMath.sol';
 import '../utils/Ownable.sol';
 
 /**
- * @title LIGHTSTREAM token team/foundation distribution
+ * @title Monthly Vesting with Bonus
  *
- * @dev Distribute purchasers, airdrop, reserve, and founder tokens
  */
 contract MonthlyVestingWithBonus is Ownable {
   using SafeMath for uint256;
@@ -26,7 +25,12 @@ contract MonthlyVestingWithBonus is Ownable {
    * startTimestamp timestamp of when vesting begins
    * endTimestamp timestamp of when vesting ends
    * lockPeriod amount of time in seconds between withdrawal periods. (EG. 6 months or 1 month)
-   * initialAmount - the initial amount of tokens to be vested.
+   * initialAmount - the initial amount of tokens to be vested that does not include the amount given as a bonus. Will not change
+   * initialAmountClaimed - amount the beneficiary has released and claimed from the initial amount
+   * initialBalance - the initialAmount less the initialAmountClaimed.  The remaining amount that can be vested.
+   * initialBonus - the initial amount of tokens given as a bonus. Will not change
+   * bonusClaimed - amount the beneficiary has released and claimed from the initial bonus
+   * bonusBalance - the initialBonus less the bonusClaimed.  The remaining amount of the bonus that can be vested
    * revocable whether the vesting is revocable or not
    * revoked whether the vesting has been revoked or not
    */
@@ -47,53 +51,39 @@ contract MonthlyVestingWithBonus is Ownable {
 
   mapping (address => VestingSchedule) public vestingSchedules;
 
-  event LogNewVesting(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus);
-  event Released(address _recipient, uint256 _amount);
-  event RevokedVesting(address _beneficiary);
-  event LogInt(string _string, uint256 _uint256);
+  /**
+   * Event for when a new vesting schedule is created
+   * @param _beneficiary Address of investor tokens minted and vested for
+   * @param _totalPurchased number of token purchased or minted not including any bonus
+   * @param _initialBonus the number of tokens given as a bonus when minting or received from early crowdsale participation
+   */
+  event NewVesting(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus);
 
   /**
-    * @dev Constructor function - Set the Lightstream token address
-    */
+   * Event for when the beneficiary releases vested tokens to their account/wallet
+   * @param _recipient address beneficiary/recipient tokens released to
+   * @param _amount the number of tokens release
+   */
+  event Released(address _recipient, uint256 _amount);
+
+  /**
+   * Event for when the owner revokes the vesting of a contributor releasing any vested tokens to the beneficiary,
+   * and the remaining balance going to the contract to be distributed by the contact owner
+   * @param _beneficiary address of beneficiary vesting is being cancelled for
+   */
+  event RevokedVesting(address _beneficiary);
+
+  /**
+   * @dev Constructor function - Set the Lightstream token address
+   */
   constructor(ERC20 _lightstream) public {
     vestedToken = _lightstream;
   }
 
-  function returnNow() public returns(uint){
-    return now;
-  }
-
   /**
-    * @dev Allow the owner of the contract to assign a new allocation
-    * @param _beneficiary The recipient of the allocation
-    * @param _totalPurchased The total amount of LIGHTSTREAM purchased
-    * @param _initialBonus The investors bonus from purchasing
-    */
-  function setVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus) internal {
-    require(vestingSchedules[_beneficiary].startTimestamp == 0);
-
-    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _initialBonus, 0, _initialBonus, true, false);
-
-    emit LogNewVesting(_beneficiary, _totalPurchased, _initialBonus);
-  }
-
-  function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus) public onlyOwner {
-    require(vestingSchedules[_beneficiary].startTimestamp != 0);
-    require(vestingSchedules[_beneficiary].initialAmount >= _totalPurchased);
-    require(vestingSchedules[_beneficiary].initialBonus >=  _initialBonus);
-
-    VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
-
-    uint256 totalPurchaseDifference = vestingSchedule.initialAmount.sub(_totalPurchased);
-    uint256 totalBonusDifference = vestingSchedule.initialBonus.sub(_initialBonus);
-
-    revokedAmount = revokedAmount.add(totalPurchaseDifference).add(totalBonusDifference);
-
-    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _initialBonus, 0, _initialBonus, true, false);
-
-    emit LogNewVesting(_beneficiary, _totalPurchased, _initialBonus);
-  }
-
+   * @dev Allows the beneficiary of a vesting schedule to release vested tokens to their account/wallet
+   * @param _beneficiary The address of the recipient of vested tokens
+   */
   function release(address _beneficiary) public returns(uint){
     require(vestingSchedules[_beneficiary].initialBalance > 0 || vestingSchedules[_beneficiary].initialBonus > 0);
     require(msg.sender == _beneficiary);
@@ -125,10 +115,12 @@ contract MonthlyVestingWithBonus is Ownable {
         emit Released(_beneficiary, withdrawableBonus);
       }
     }
-
-
   }
 
+  /**
+   * @dev Allows the to revoke the vesting schedule for a contributor/investor with a vesting schedule
+   * @param _beneficiary Address of contributor/investor with a vesting schedule to be revoked
+   */
   function revokeVesting (address _beneficiary) onlyOwner public {
     require(vestingSchedules[_beneficiary].revocable == true);
 
@@ -163,10 +155,53 @@ contract MonthlyVestingWithBonus is Ownable {
   }
 
   /**
- * @notice Calculates the total amount vested since the start time. If after the endTime
- * the entire initialBalance is returned
- */
+   * @dev Allows the owner to transfer any tokens that have been revoked to be transfered to another address
+   * @param _recipient The address where the tokens should be sent
+   * @param _amount Number of tokens to be transfer to recipient
+   */
+  function transferRevokedTokens(address _recipient, uint256 _amount) public onlyOwner {
+    require(_amount <= revokedAmount);
+    require(_recipient != address(0));
 
+    require(vestedToken.transfer(_recipient, _amount));
+  }
+
+
+  /**
+   * @dev Sets the vesting schedule for a beneficiary who either purchased tokens or had them minted
+   * @param _beneficiary The recipient of the allocation
+   * @param _totalPurchased The total amount of Lightstream purchased
+   * @param _initialBonus The investors bonus from purchasing
+   */
+  function setVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus) internal {
+    require(vestingSchedules[_beneficiary].startTimestamp == 0);
+
+    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _initialBonus, 0, _initialBonus, true, false);
+
+    emit NewVesting(_beneficiary, _totalPurchased, _initialBonus);
+  }
+
+  function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus) public onlyOwner {
+    require(vestingSchedules[_beneficiary].startTimestamp != 0);
+    require(vestingSchedules[_beneficiary].initialAmount >= _totalPurchased);
+    require(vestingSchedules[_beneficiary].initialBonus >=  _initialBonus);
+
+    VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
+
+    uint256 totalPurchaseDifference = vestingSchedule.initialAmount.sub(_totalPurchased);
+    uint256 totalBonusDifference = vestingSchedule.initialBonus.sub(_initialBonus);
+
+    revokedAmount = revokedAmount.add(totalPurchaseDifference).add(totalBonusDifference);
+
+    vestingSchedules[_beneficiary] = VestingSchedule(now, now + 150 days, 30 days, _totalPurchased, 0, _totalPurchased, _initialBonus, 0, _initialBonus, true, false);
+
+    emit NewVesting(_beneficiary, _totalPurchased, _initialBonus);
+  }
+
+  /**
+   * @dev Calculates the total amount vested since the start time. If after the endTime
+   * the entire initialBalance is returned
+   */
   function calculateTotalAmountVested(address _beneficiary, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _initialAmount) internal view returns (uint256 _amountVested) {
     // If it's past the end time, the whole amount is available.
     if (now >= _endTimestamp) {
@@ -183,16 +218,19 @@ contract MonthlyVestingWithBonus is Ownable {
       totalVestingTime
     );
 
-    emit LogInt('totalAmountVested', vestedAmount);
     return vestedAmount;
   }
 
   /**
- * @notice Calculates the amount releasable. If the amount is less than the allowable amount
- * for each lock period zero will be returned. If more than the allowable amount each month will return
- * a multiple of the allowable amount each month
- */
-
+   * @dev Calculates the amount releasable. If the amount is less than the allowable amount
+   * for each lock period zero will be returned. If more than the allowable amount each month will return
+   * a multiple of the allowable amount each month
+   * @param _amountWithdrawable The total amount vested so far less the amount that has been released so far
+   * @param _startTimestamp The start time of for when vesting started
+   * @param _endTimestamp The end time of for when vesting will be complete and all tokens available
+   * @param _lockPeriod time interval (ins econds) in between vesting releases (example 30 days = 2592000 seconds)
+   * @param _initialAmount The starting number of tokens vested
+   */
   function withdrawalAllowed(uint256 _amountWithdrawable, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount) internal view returns(uint256 _amountReleasable) {
     // If it's past the end time, the whole amount is available.
     if (now >= _endTimestamp) {
@@ -214,7 +252,19 @@ contract MonthlyVestingWithBonus is Ownable {
     return 0;
   }
 
-  function calculateBonusWithdrawal(uint256 _startTimestamp, uint _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount, uint256 _initialBonus) internal view returns(uint256) {
+  /**
+   * @dev Calculates the amount of the bonus that is releasable. If the amount is less than the allowable amount
+   * for each lock period zero will be returned. It has been 30 days since the initial vesting has ended an amount
+   * equal to the original releases will be returned.  If over 60 days the entire bonus can be released
+   * @param _amountWithdrawable The total amount vested so far less the amount that has been released so far
+   * @param _startTimestamp The start time of for when vesting started
+   * @param _endTimestamp The end time of for when vesting will be complete and all tokens available
+   * @param _lockPeriod time interval (ins econds) in between vesting releases (example 30 days = 2592000 seconds)
+   * @param _initialAmount The starting number of tokens vested
+   * @param _initialBonus The number of tokens given as a bonus
+   */
+
+  function calculateBonusWithdrawal(uint256 _startTimestamp, uint _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount, uint256 _initialBonus) internal view returns(uint256 _amountWithdrawable) {
     // calculate the number of time periods vesting is done over
     uint256 lockPeriods = (_endTimestamp.sub(_startTimestamp)).div(_lockPeriod);
     uint256 amountWithdrawablePerLockPeriod = SafeMath.div(_initialAmount, lockPeriods);
@@ -231,20 +281,5 @@ contract MonthlyVestingWithBonus is Ownable {
     }
 
     return 0;
-  }
-
-  function transferRevokedTokens(address _recipient, uint256 _amount) public onlyOwner {
-    require(_amount <= revokedAmount);
-    require(_recipient != address(0));
-
-    require(vestedToken.transfer(_recipient, _amount));
-  }
-
-  // Allow transfer of accidentally sent ERC20 tokens
-  function refundTokens(address _recipient, address _token) public onlyOwner {
-    require(_token != address(vestedToken));
-    ERC20 refundToken = ERC20(_token);
-    uint256 balance = refundToken.balanceOf(this);
-    require(refundToken.transfer(_recipient, balance));
   }
 }

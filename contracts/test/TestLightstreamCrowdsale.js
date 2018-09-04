@@ -82,27 +82,72 @@ contract('Crowdsale', async (accounts)=> {
 
   it('The owner should be able to add an address to the whitelist', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
     const transaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
-    const whitelisted = await crowdsaleInstance.whitelist(CONTRIBUTOR_1_ACCOUNT);
+    const whitelisted = await crowdsaleInstance.whitelist(CONTRIBUTOR_1_ACCOUNT)
+
     assert(whitelisted, 'Address not added to whitelist');
+  });
+
+  it('The owner should be able to remove an address from the whitelist', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+    const removeTransaction = await crowdsaleInstance.removeAddressFromWhitelist(CONTRIBUTOR_1_ACCOUNT);
+    const whitelisted = await crowdsaleInstance.whitelist(CONTRIBUTOR_1_ACCOUNT)
+
+    assert.equal(whitelisted, false, 'Address not added to whitelist');
+
+    const addTransaction = await crowdsaleInstance.addAddressToWhitelist(CONTRIBUTOR_1_ACCOUNT);
   });
 
   it('The owner should be able to add multiple addresses to the whitelist', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
-    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,
-                                                                        CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+
+    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+
     const whitelisted2 = await crowdsaleInstance.whitelist(CONTRIBUTOR_2_ACCOUNT);
     const whitelisted3 = await crowdsaleInstance.whitelist(CONTRIBUTOR_3_ACCOUNT);
     const whitelisted4 = await crowdsaleInstance.whitelist(CONTRIBUTOR_4_ACCOUNT);
     const whitelisted5 = await crowdsaleInstance.whitelist(CONTRIBUTOR_5_ACCOUNT);
-    const whitelisted6 = await crowdsaleInstance.whitelist(CONTRIBUTOR_6_ACCOUNT);
 
-    assert(whitelisted2, 'Address 2 not added to whitelist');
-    assert(whitelisted3, 'Address 3 not added to whitelist');
-    assert(whitelisted4, 'Address 4 not added to whitelist');
-    assert(whitelisted5, 'Address 5 not added to whitelist');
-    assert(whitelisted6, 'Address 6 not added to whitelist');
+    assert.equal(whitelisted2, true, 'Address 2 not added to whitelist');
+    assert.equal(whitelisted3, true, 'Address 3 not added to whitelist');
+    assert.equal(whitelisted4, true, 'Address 4 not added to whitelist');
+    assert.equal(whitelisted5, true, 'Address 5 not added to whitelist');
   });
+
+  it('The owner should be able to remove multiple addresses to the whitelist', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+    const transaction = await crowdsaleInstance.removeAddressesFromWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+
+    const whitelisted2 = await crowdsaleInstance.whitelist(CONTRIBUTOR_2_ACCOUNT);
+    const whitelisted3 = await crowdsaleInstance.whitelist(CONTRIBUTOR_3_ACCOUNT);
+    const whitelisted4 = await crowdsaleInstance.whitelist(CONTRIBUTOR_4_ACCOUNT);
+    const whitelisted5 = await crowdsaleInstance.whitelist(CONTRIBUTOR_5_ACCOUNT);
+
+    assert.equal(whitelisted2, false, 'Address 2 not removed from whitelist');
+    assert.equal(whitelisted3, false, 'Address 3 not removed from whitelist');
+    assert.equal(whitelisted4, false, 'Address 4 not not removed from whitelist');
+    assert.equal(whitelisted5, false, 'Address 5 not not removed from whitelist');
+  });
+
+  it('The owner should be able to add back multiple addresses to the whitelist', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+
+    const transaction = await crowdsaleInstance.addAddressesToWhitelist([CONTRIBUTOR_2_ACCOUNT, CONTRIBUTOR_3_ACCOUNT,CONTRIBUTOR_4_ACCOUNT, CONTRIBUTOR_5_ACCOUNT, CONTRIBUTOR_6_ACCOUNT]);
+
+    const whitelisted2 = await crowdsaleInstance.whitelist(CONTRIBUTOR_2_ACCOUNT);
+    const whitelisted3 = await crowdsaleInstance.whitelist(CONTRIBUTOR_3_ACCOUNT);
+    const whitelisted4 = await crowdsaleInstance.whitelist(CONTRIBUTOR_4_ACCOUNT);
+    const whitelisted5 = await crowdsaleInstance.whitelist(CONTRIBUTOR_5_ACCOUNT);
+
+    assert.equal(whitelisted2, true, 'Address 2 not added to whitelist');
+    assert.equal(whitelisted3, true, 'Address 3 not added to whitelist');
+    assert.equal(whitelisted4, true, 'Address 4 not added to whitelist');
+    assert.equal(whitelisted5, true, 'Address 5 not added to whitelist');
+  });
+
 
   it('Only the owner should be able to add an address to the whitelist', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
@@ -241,6 +286,23 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(100000, vestedBonus);
   });
 
+  it('The owner should not be able mint an amount greater than what is available for the crowdsale', async ()=> {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+    //console.log(tokenInstance);
+    // 333000 is the min and 13.5 million is the max
+    const initialPurchase = convertEtherToWeiBN(165000000);
+    const initialBonus = convertEtherToWeiBN(100000);
+
+    try {
+      const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_3, initialPurchase, initialBonus);
+      assert(true, false);
+    } catch(error){
+      assert(error);
+    }
+
+  });
+
   it('The owner should be not be able to mint an initial amount and bonus for a whitelisted address that has a vesting schedule', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     const tokenInstance = await LightstreamToken.deployed();
@@ -250,7 +312,7 @@ contract('Crowdsale', async (accounts)=> {
 
     try {
       const mintAndVest = await crowdsaleInstance.mintAndVest(MINT_ACCOUNT_1, initialPurchase, initialBonus);
-      assert(true, false);
+      assert.equal(true, false);
     } catch(error){
       assert(error);
     }
@@ -316,7 +378,7 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(50000, vestingBonusAfter);
   });
 
-  it('Only the owner should not be able to update the vesting schedule if there was an error', async ()=> {
+  it('Only the owner should be able to update the vesting schedule if there was an error', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
     // originally 500000, and 100000
     const initialPurchase = convertEtherToWeiBN(400000);
@@ -562,6 +624,19 @@ contract('Crowdsale', async (accounts)=> {
     }
   });
 
+  it('When finalize is called on the sales contract the team contract gets 135 million PTH', async ()=>{
+    const crowdsalesInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    const finalize = await crowdsalesInstance.finalize();
+    const crowdsaleBalanceBN = await tokenInstance.balanceOf(TeamDistribution.address);
+
+    const crowdsaleBalance = convertFromBnToInt(crowdsaleBalanceBN);
+
+    assert(crowdsaleBalance, 135000000);
+  });
+
+
   // 1 MONTH (ISH) AFTER PURCHASE
   it('The first contributor should be able to release the 1/5th of their vested tokens after 30 days - Month 1', async ()=> {
     const crowdsaleInstance = await LightstreamCrowdsale.deployed();
@@ -594,6 +669,8 @@ contract('Crowdsale', async (accounts)=> {
     assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimed);
     assert.equal(vestingBalanceBefore - vestingBalanceAfter, initialAmountClaimed);
   });
+
+
 
   // 30 DAYS LATER - 60 TOTAL
   it('The first contributor should be able to release the 1/5th of their vested tokens the next 30 days - Month 2', async ()=> {

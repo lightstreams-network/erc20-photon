@@ -9,7 +9,7 @@ import '../utils/Ownable.sol';
 /**
  * @title LIGHTSTREAM token team/foundation distribution
  *
- * @dev Distribute purchasers, airdrop, reserve, and founder tokens
+ * @dev Sets vesting and distributes to team members, seed investor, founders, advisors, consultants
  */
 contract TeamDistribution is Ownable {
   using SafeMath for uint256;
@@ -33,13 +33,14 @@ contract TeamDistribution is Ownable {
   uint256 public startTime;
 
   /**
-   * @dev Creates Allocation with vesting information
+   * @notice Creates Allocation with vesting information
    * AllocationSupply Type of allocation
-   * beneficiary address of the beneficiary to whom vested tokens are transferred
    * startTimestamp timestamp of when vesting begins
    * endTimestamp timestamp of when vesting ends
    * lockPeriod amount of time in seconds between withdrawal periods. (EG. 6 months or 1 month)
    * initialAmount - the initial amount of tokens to be vested.
+   * amountClaimed - the amount that has been released from vesting.
+   * balance - the current amount remaining that will vest.
    * revocable whether the vesting is revocable or not
    * revoked whether the vesting has been revoked or not
    */
@@ -58,14 +59,14 @@ contract TeamDistribution is Ownable {
   mapping (address => Allocation) public allocations;
   
   event NewAllocation(address _recipient, AllocationType indexed _fromSupply, uint256 _totalAllocated, uint256 _grandTotalAllocated);
-  event RevokedAllocation(address _recipient);
   event Released(address _recipient, uint256 _amount);
-  event LogUint(string _type, uint256 _uint);
+  event RevokedAllocation(address _recipient);
 
   /**
-    * @dev Constructor function - Set the Lightstream token address
-    * @param _startTime The time when Lightstream Distribution goes live
-    */
+   * @notice Constructor function - Set the Lightstream token address
+   * @param _startTime The time when Lightstream Distribution goes live
+   * @param _lightstream the address of the Lightstream token
+   */
   constructor(uint256 _startTime, ERC20 _lightstream) public {
     // make sure the start time is in the future
     require(_startTime >= now);
@@ -75,18 +76,13 @@ contract TeamDistribution is Ownable {
     token = _lightstream;
   }
 
-  function returnNow() public returns(uint){
-    return now;
-  }
-
   /**
-    * @dev Allow the owner of the contract to assign a new allocation
-    * @param _beneficiary The recipient of the allocation
-    * @param _totalAllocated The total amount of LIGHTSTREAM available to the receipient (after vesting)
-    * @param _supply The LIGHTSTREAM supply the allocation will be taken from
-    */
+   * @notice Allow the owner of the contract to assign a new allocation.
+   * @param _beneficiary The recipient of the allocation
+   * @param _totalAllocated The total amount of Lightstream available to the recipient (after vesting)
+   * @param _supply The Lightstream supply the allocation will be taken from
+   */
   function setAllocation (address _beneficiary, uint256 _totalAllocated, AllocationType _supply) onlyOwner public {
-
     // check to make sure the recipients address current allocation is zero and that the amount being allocated is greater than zero
     require(_totalAllocated > 0);
     // check to make sure the address exists so tokens don't get burnt
@@ -147,8 +143,10 @@ contract TeamDistribution is Ownable {
     emit NewAllocation(_beneficiary, _supply, _totalAllocated, grandTotalAllocated());
   }
 
-
-
+  /**
+   * @notice Allows the beneficiary that an allocation was created for to release the tokens to their wallet.
+   * @param _beneficiary The recipient of the allocation and where the tokens will be released to
+   */
   function release(address _beneficiary) public {
     require(startTime <= now);
     require(allocations[_beneficiary].balance > 0);
@@ -169,6 +167,12 @@ contract TeamDistribution is Ownable {
       }
   }
 
+  /**
+   * @notice Allows owner to revoke an allocation of team member, seed investor, or founder. Any amount that has vested
+   * will be transfer to the beneficiary's wallet, the remaining amount will increase the other pool where the tokens
+   * can be transfer to any wallet or contract from
+   * @param _beneficiary The address of the allocation that is being revoked
+   */
   function revokeAllocation (address _beneficiary) onlyOwner public {
     Allocation memory allocation = allocations[_beneficiary];
 
@@ -179,12 +183,8 @@ contract TeamDistribution is Ownable {
     uint256 amountWithdrawable = totalAmountVested.sub(allocation.amountClaimed);
 
     uint256 refundable = withdrawalAllowed(amountWithdrawable,  allocation.startTimestamp, allocation.endTimestamp, allocation.lockPeriod, allocation.initialAmount);
-    emit LogUint('balance', balance);
-    emit LogUint('refundable', refundable);
-
 
     uint256 backToProjectWallet = allocation.balance.sub(refundable);
-    emit LogUint('backToProjectWallet', backToProjectWallet);
 
     if(refundable > 0) {
       token.safeTransfer(_beneficiary, refundable);
@@ -200,10 +200,31 @@ contract TeamDistribution is Ownable {
   }
 
   /**
- * @notice Calculates the total amount vested since the start time. If after the endTime
- * the entire balance is returned
- */
+   * @notice Returns the amount of Lightstream allocated
+   */
+  function grandTotalAllocated() public view returns (uint256) {
+    return INITIAL_SUPPLY - AVAILABLE_TOTAL_SUPPLY;
+  }
 
+  /**
+   * @notice Allows transfer of accidentally sent ERC20 tokens to contract
+   * @param _recipient address of recipient to receive ERC20 token
+   * @param _token address ERC20 token to transfer
+   */
+  function refundTokens(address _recipient, address _token) public onlyOwner {
+    require(_token != address(token));
+    ERC20 refundToken = ERC20(_token);
+    uint256 balance = refundToken.balanceOf(this);
+    require(refundToken.transfer(_recipient, balance));
+  }
+
+  /**
+   * @notice Calculates the total amount vested since the start time. If after the endTime the entire balance is returned
+   * @param _beneficiary The address of the allocation vesting is being calculated for
+   * @param _startTimestamp The start time of for when vesting started
+   * @param _endTimestamp The end time of for when vesting will be complete and all tokens available
+   * @param _initialAmount The starting number of tokens vested
+   */
   function calculateTotalAmountVested(address _beneficiary, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _initialAmount) internal view returns (uint256 _amountVested) {
     // If it's past the end time, the whole amount is available.
     if (now >= _endTimestamp) {
@@ -224,10 +245,15 @@ contract TeamDistribution is Ownable {
   }
 
   /**
- * @notice Calculates the amount releasable. If the amount is less than the allowable amount
- * for each lock period zero will be returned. If more than the allowable amount each month will return
- * a multiple of the allowable amount each month
- */
+   * @notice Calculates the amount releasable. If the amount is less than the allowable amount
+   * for each lock period zero will be returned. If more than the allowable amount each month will return
+   * a multiple of the allowable amount each month
+   * @param _amountWithdrawable The total amount vested so far less the amount that has been released so far
+   * @param _startTimestamp The start time of for when vesting started
+   * @param _endTimestamp The end time of for when vesting will be complete and all tokens available
+   * @param _lockPeriod time interval (ins econds) in between vesting releases (example 30 days = 2592000 seconds)
+   * @param _initialAmount The starting number of tokens vested
+   */
 
   function withdrawalAllowed(uint256 _amountWithdrawable, uint256 _startTimestamp, uint256 _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount) internal view returns(uint256) {
     // If it's past the end time, the whole amount is available.
@@ -248,18 +274,5 @@ contract TeamDistribution is Ownable {
     }
 
     return 0;
-  }
-
-  // Returns the amount of LIGHTSTREAM allocated
-  function grandTotalAllocated() public view returns (uint256) {
-    return INITIAL_SUPPLY - AVAILABLE_TOTAL_SUPPLY;
-  }
-
-  // Allow transfer of accidentally sent ERC20 tokens
-  function refundTokens(address _recipient, address _token) public onlyOwner {
-    require(_token != address(token));
-    ERC20 refundToken = ERC20(_token);
-    uint256 balance = refundToken.balanceOf(this);
-    require(refundToken.transfer(_recipient, balance));
   }
 }
