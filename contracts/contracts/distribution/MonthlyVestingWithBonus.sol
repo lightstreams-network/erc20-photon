@@ -105,19 +105,17 @@ contract MonthlyVestingWithBonus is Ownable {
       emit Released(_beneficiary, releasable);
     }
 
-
     if (now > vestingSchedule.endTimestamp && vestingSchedule.bonusBalance > 0) {
       uint256 withdrawableBonus = calculateBonusWithdrawal(vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount, vestingSchedule.bonusBalance);
-
-      if(withdrawableBonus > 0) {
-
-      emit LogInt('withdrawableBonus', withdrawableBonus);
-
-      vestingSchedules[_beneficiary].bonusClaimed = vestingSchedule.bonusClaimed.add(withdrawableBonus);
-      vestingSchedules[_beneficiary].bonusBalance = vestingSchedule.bonusBalance.sub(withdrawableBonus);
-
-      vestedToken.safeTransfer(_beneficiary, withdrawableBonus);
-      emit Released(_beneficiary, withdrawableBonus);
+  
+      if (withdrawableBonus > 0) {
+        emit LogInt('withdrawableBonus', withdrawableBonus);
+    
+        vestingSchedules[_beneficiary].bonusClaimed = vestingSchedule.bonusClaimed.add(withdrawableBonus);
+        vestingSchedules[_beneficiary].bonusBalance = vestingSchedule.bonusBalance.sub(withdrawableBonus);
+    
+        vestedToken.safeTransfer(_beneficiary, withdrawableBonus);
+        emit Released(_beneficiary, withdrawableBonus);
       }
     }
   }
@@ -270,15 +268,17 @@ contract MonthlyVestingWithBonus is Ownable {
    */
 
   function calculateBonusWithdrawal(uint256 _startTimestamp, uint _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount, uint256 _bonusBalance) internal view returns(uint256 _amountWithdrawable) {
-
     if (now >= _endTimestamp.add(30 days) && now < _endTimestamp.add(60 days)) {
       // calculate the number of time periods vesting is done over
       uint256 lockPeriods = (_endTimestamp.sub(_startTimestamp)).div(_lockPeriod);
       uint256 amountWithdrawablePerLockPeriod = SafeMath.div(_initialAmount, lockPeriods);
-
+      
+      if (_bonusBalance < amountWithdrawablePerLockPeriod) {
+        return _bonusBalance;
+      }
+      
       return amountWithdrawablePerLockPeriod;
     } else if (now >= _endTimestamp.add(60 days)){
-
       return _bonusBalance;
     }
 
