@@ -105,19 +105,17 @@ contract MonthlyVestingWithBonus is Ownable {
       emit Released(_beneficiary, releasable);
     }
 
-
     if (now > vestingSchedule.endTimestamp && vestingSchedule.bonusBalance > 0) {
-      uint256 withdrawableBonus = calculateBonusWithdrawal(vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount, vestingSchedule.bonusBalance);
-
-      if(withdrawableBonus > 0) {
-
-      emit LogInt('withdrawableBonus', withdrawableBonus);
-
-      vestingSchedules[_beneficiary].bonusClaimed = vestingSchedule.bonusClaimed.add(withdrawableBonus);
-      vestingSchedules[_beneficiary].bonusBalance = vestingSchedule.bonusBalance.sub(withdrawableBonus);
-
-      vestedToken.safeTransfer(_beneficiary, withdrawableBonus);
-      emit Released(_beneficiary, withdrawableBonus);
+      uint256 withdrawableBonus = calculateBonusWithdrawal(vestingSchedule.endTimestamp, 1 days, vestingSchedule.initialBonus, vestingSchedule.bonusBalance);
+  
+      if (withdrawableBonus > 0) {
+        emit LogInt('withdrawableBonus', withdrawableBonus);
+    
+        vestingSchedules[_beneficiary].bonusClaimed = vestingSchedule.bonusClaimed.add(withdrawableBonus);
+        vestingSchedules[_beneficiary].bonusBalance = vestingSchedule.bonusBalance.sub(withdrawableBonus);
+    
+        vestedToken.safeTransfer(_beneficiary, withdrawableBonus);
+        emit Released(_beneficiary, withdrawableBonus);
       }
     }
   }
@@ -135,7 +133,7 @@ contract MonthlyVestingWithBonus is Ownable {
     uint256 amountWithdrawable = totalAmountVested.sub(vestingSchedule.initialAmountClaimed);
 
     uint256 refundable = withdrawalAllowed(amountWithdrawable,  vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount);
-    uint256 refundableBonus = calculateBonusWithdrawal(vestingSchedule.startTimestamp, vestingSchedule.endTimestamp, vestingSchedule.lockPeriod, vestingSchedule.initialAmount, vestingSchedule.bonusBalance);
+    uint256 refundableBonus = calculateBonusWithdrawal(vestingSchedule.endTimestamp, 1 days, vestingSchedule.initialBonus, vestingSchedule.bonusBalance);
 
     uint256 toProjectWalletFromInitialAmount = vestingSchedule.initialBalance.sub(refundable);
     uint256 toProjectWalletFromInitialBonus = vestingSchedule.initialBonus.sub(refundableBonus);
@@ -262,23 +260,25 @@ contract MonthlyVestingWithBonus is Ownable {
    * for each lock period zero will be returned. It has been 30 days since the initial vesting has ended an amount
    * equal to the original releases will be returned.  If over 60 days the entire bonus can be released
    * @param _amountWithdrawable The total amount vested so far less the amount that has been released so far
-   * @param _startTimestamp The start time of for when vesting started
    * @param _endTimestamp The end time of for when vesting will be complete and all tokens available
-   * @param _lockPeriod time interval (ins econds) in between vesting releases (example 30 days = 2592000 seconds)
+   * @param _lockPeriod time interval (in seconds) in between vesting releases (example 30 days = 2592000 seconds)
    * @param _initialAmount The starting number of tokens vested
    * @param _bonusBalance The current balance of the vested bonus
    */
 
-  function calculateBonusWithdrawal(uint256 _startTimestamp, uint _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount, uint256 _bonusBalance) internal view returns(uint256 _amountWithdrawable) {
-
+  function calculateBonusWithdrawal(uint _endTimestamp, uint256 _lockPeriod, uint256 _initialAmount, uint256 _bonusBalance) internal view returns(uint256 _amountWithdrawable) {
     if (now >= _endTimestamp.add(30 days) && now < _endTimestamp.add(60 days)) {
       // calculate the number of time periods vesting is done over
-      uint256 lockPeriods = (_endTimestamp.sub(_startTimestamp)).div(_lockPeriod);
-      uint256 amountWithdrawablePerLockPeriod = SafeMath.div(_initialAmount, lockPeriods);
-
-      return amountWithdrawablePerLockPeriod;
+      uint256 bonusStartVest = _endTimestamp.add(30 days);
+      uint256 bonusEndVest = _endTimestamp.add(60 days);
+      uint256 lockPeriods = SafeMath.div(SafeMath.sub(bonusEndVest, bonusStartVest), _lockPeriod);
+      uint256 vestingPerPeriod = SafeMath.div(_initialAmount, lockPeriods);
+      uint256 currentLockPeriod = SafeMath.div(SafeMath.sub(now, bonusStartVest), _lockPeriod);
+      uint256 vestedAmount = SafeMath.mul(currentLockPeriod, vestingPerPeriod);
+      uint256 withdrawn = SafeMath.sub(_initialAmount, _bonusBalance);
+      uint256 withdrawable = SafeMath.sub(vestedAmount, withdrawn);
+      return withdrawable;
     } else if (now >= _endTimestamp.add(60 days)){
-
       return _bonusBalance;
     }
 

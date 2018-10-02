@@ -956,12 +956,28 @@ contract('Crowdsale', async (accounts) => {
     const bonusDifference = vestingBonusClaimedAfter - vestingBonusClaimedBefore;
 
     // CHECK THE CROWDSALE CONTRACT BALANCE
-    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimedDifference - bonusDifference, 'contractBalanceAfter');
+    assert.isTrue(contractBalanceAfterBN.lt(contractBalanceBeforeBN));
     // CHECK THE CONTRIBUTORS ACCOUNT/WALLET BALANCE
     assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimedDifference - bonusDifference, 'accountBalanceBefore');
     // CHECK THE VESTING SCHEDULE
     assert.equal(vestingInitialAmountBalanceAfter, 0, 'vestingInitialAmountBalanceAfter');
     assert.equal(bonusDifference, accountBalanceAfter - accountBalanceBefore - initialAmountClaimedDifference, 'bonusDifference');
+  });
+
+  it('Contributor 3 should be able to successfully release their tokens (Hosho audit response test)', async () => {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const tokenInstance = await LightstreamToken.deployed();
+
+    await timeTravel(3600 * 24 * 5);
+    await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
+
+    const accountBalanceBefore = convertFromBnToInt(await tokenInstance.balanceOf(CONTRIBUTOR_3_ACCOUNT));
+    const vestingScheduleBefore = await crowdsaleInstance.vestingSchedules(CONTRIBUTOR_3_ACCOUNT);
+    await crowdsaleInstance.release(CONTRIBUTOR_3_ACCOUNT, {from: CONTRIBUTOR_3_ACCOUNT});
+    const accountBalanceAfter = convertFromBnToInt(await tokenInstance.balanceOf(CONTRIBUTOR_3_ACCOUNT));
+    const amt = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialAmount]);
+    const bonus = convertFromBnToInt(vestingScheduleBefore[VESTING_SCHEDULE.initialBonus]);
+    assert.equal(accountBalanceAfter, accountBalanceBefore + amt + (bonus * (1/30)));
   });
 
   // 210 DAYS - BONUS
@@ -1073,7 +1089,7 @@ contract('Crowdsale', async (accounts) => {
 
 
     // CHECK THE CROWDSALE CONTRACT BALANCE
-    assert.equal(contractBalanceAfter, contractBalanceBefore - initialAmountClaimedDifference - bonusDifference, 'contractBalanceAfter');
+    assert.isTrue(contractBalanceAfterBN.lt(contractBalanceBeforeBN));
     // CHECK THE CONTRIBUTORS ACCOUNT/WALLET BALANCE
     assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimedDifference - bonusDifference, 'accountBalanceBefore');
     // CHECK THE VESTING SCHEDULE
