@@ -956,7 +956,7 @@ contract('Crowdsale', async (accounts) => {
     const bonusDifference = vestingBonusClaimedAfter - vestingBonusClaimedBefore;
 
     // CHECK THE CROWDSALE CONTRACT BALANCE
-    assert.equal(Math.floor(contractBalanceAfter), Math.floor(contractBalanceBefore - initialAmountClaimedDifference - bonusDifference), 'contractBalanceAfter');
+    assert.isTrue(contractBalanceAfterBN.lt(contractBalanceBeforeBN));
     // CHECK THE CONTRIBUTORS ACCOUNT/WALLET BALANCE
     assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimedDifference - bonusDifference, 'accountBalanceBefore');
     // CHECK THE VESTING SCHEDULE
@@ -1089,7 +1089,7 @@ contract('Crowdsale', async (accounts) => {
 
 
     // CHECK THE CROWDSALE CONTRACT BALANCE
-    assert.equal(Math.floor(contractBalanceAfter), Math.floor(contractBalanceBefore - initialAmountClaimedDifference - bonusDifference), 'contractBalanceAfter');
+    assert.isTrue(contractBalanceAfterBN.lt(contractBalanceBeforeBN));
     // CHECK THE CONTRIBUTORS ACCOUNT/WALLET BALANCE
     assert.equal(accountBalanceBefore, accountBalanceAfter - initialAmountClaimedDifference - bonusDifference, 'accountBalanceBefore');
     // CHECK THE VESTING SCHEDULE
