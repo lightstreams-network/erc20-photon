@@ -19,8 +19,8 @@ const mnemonic = "pretty icon force payment fine toward artist rely mistake comb
 module.exports = {
   networks: {
     development: {
-      host: 'localhost',
-      port: 8545,
+      host: '127.0.0.1',
+      port: 9545,
       network_id: '*',
       gas: 6721975
     },
