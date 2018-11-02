@@ -78,6 +78,8 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
     uint256 bonus
   );
 
+  event FundsReceivedOnFallback(address sender, uint256 value);
+
   /**
    * @param _rate Number of token units a buyer gets per wei
    * @param _wallet Address where collected funds will be forwarded to
@@ -104,7 +106,8 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    */
   function () external payable {
     require(msg.data.length == 0);
-    buyTokens(msg.sender);
+    emit FundsReceivedOnFallback(msg.sender, msg.value);
+    _forwardFunds();
   }
 
   /**
