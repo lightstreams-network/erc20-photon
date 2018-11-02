@@ -187,8 +187,11 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    */
   function refundTokens(address _recipient, address _token) public onlyOwner {
     require(_token != address(token));
+    require(_recipient != address(0));
+    require(_token != address(0));
     ERC20 refundToken = ERC20(_token);
     uint256 balance = refundToken.balanceOf(this);
+    require(balance > 0);
     require(refundToken.transfer(_recipient, balance));
   }
 
