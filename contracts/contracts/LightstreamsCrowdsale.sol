@@ -6,12 +6,12 @@ import "./distribution/MonthlyVestingWithBonus.sol";
 import "./crowdsale/MintedCrowdsale.sol";
 import "./crowdsale/TimedCrowdsale.sol";
 import "./crowdsale/WhitelistedCrowdsale.sol";
-import "./LightstreamToken.sol";
+import "./LightstreamsToken.sol";
 import "./token/MintableToken.sol";
 
 
 /**
- * @title LightstreamCrowdsale
+ * @title LightstreamsCrowdsale
  * The way to add new features to a base crowdsale is by multiple inheritance.
  * In this example we are providing following extensions:
  * TimedCrowdsale - set the start and end time for the sale
@@ -24,7 +24,7 @@ import "./token/MintableToken.sol";
  */
 
 
-contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, FinalizableCrowdsale, MintedCrowdsale, WhitelistedCrowdsale {
+contract LightstreamsCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, FinalizableCrowdsale, MintedCrowdsale, WhitelistedCrowdsale {
 
   // Token Distribution
   // =============================
@@ -43,7 +43,7 @@ contract LightstreamCrowdsale is TimedCrowdsale, TokenCappedCrowdsale, Finalizab
     uint256 _openingTime, // Timestamp in epoch format (online calculator: https://www.unixtimestamp.com/index.php)
     uint256 _closingTime,
     address _wallet,  // address of the wallet that receives funds
-    LightstreamToken _token, // address of deployed token contract
+    LightstreamsToken _token, // address of deployed token contract
     address _distributionContract
   )
   public

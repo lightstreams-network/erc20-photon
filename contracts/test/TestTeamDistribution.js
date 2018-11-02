@@ -1,7 +1,7 @@
 const chai = require('chai')
-let LightstreamToken = artifacts.require("LightstreamToken");
+let LightstreamsToken = artifacts.require("LightstreamsToken");
 let TeamDistribution = artifacts.require("distribution/TeamDistribution");
-let LightstreamCrowdsale = artifacts.require("LightstreamCrowdsale");
+let LightstreamsCrowdsale = artifacts.require("LightstreamsCrowdsale");
 chai.use(require('chai-as-promised'))
 const assert = chai.assert;
 
@@ -67,19 +67,19 @@ const ALLOCATION = {
   revoked: 8
 }
 
-contract('LightstreamToken', async (accounts)=> {
+contract('LightstreamsToken', async (accounts)=> {
   it('should deploy the token and store the address', async ()=> {
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
 
     assert.isDefined(tokenInstance.address, 'Token address couldn\'t be stored');
   });
 
   it('should transfer the ownership to the crowdsale contract', async ()=> {
-      const instance = await LightstreamToken.deployed();
-      const data = await instance.transferOwnership(LightstreamCrowdsale.address);
+      const instance = await LightstreamsToken.deployed();
+      const data = await instance.transferOwnership(LightstreamsCrowdsale.address);
       const owner = await instance.owner();
 
-      assert.equal(LightstreamCrowdsale.address, owner);
+      assert.equal(LightstreamsCrowdsale.address, owner);
   });
 
 });
@@ -111,9 +111,9 @@ contract('Team Distribution', async (accounts)=> {
   });
 
   it('When finalize is called on the sales contract the team contract gets 135 million PTH', async ()=>{
-    const crowdsalesInstance = await LightstreamCrowdsale.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
-    const data = await tokenInstance.transferOwnership(LightstreamCrowdsale.address);
+    const crowdsalesInstance = await LightstreamsCrowdsale.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
+    const data = await tokenInstance.transferOwnership(LightstreamsCrowdsale.address);
 
     const timeTravelTransaction = await timeTravel(3600 * 24 * 32); // Travel 32 days into the future so sale has finished
     const mineBlockTransaction = await mineBlock(); // workaround for https://github.com/ethereumjs/testrspc/issues/336
@@ -240,7 +240,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can create an allocation from the advisors supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
     const PHT = web3.toWei('100', 'ether');
 
     const advisorsSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_ADVISORS_SUPPLY.call();
@@ -273,7 +273,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can create an allocation from the consultants supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
     const PHT = web3.toWei('100', 'ether');
 
     const consultantSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_CONSULTANTS_SUPPLY.call();
@@ -306,7 +306,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The owner can create an allocation from the others supply', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
     const PHT = web3.toWei('100', 'ether');
 
     const otherSupplyBeforeBN = await teamDistributionInstance.AVAILABLE_OTHER_SUPPLY.call();
@@ -340,7 +340,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The team member can release their vested amount', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
 
     const timeTravelTransaction = await timeTravel(3600 * 24 * 30 * 3); // Travel 3 months into the future for testing
     await mineBlock();
@@ -367,7 +367,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The seed investor can release their vested amount', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
 
     const allocationDataBefore = await teamDistributionInstance.allocations(SEED_INVESTOR_ACCOUNT);
     const allocationBalanceBeforeRelease = convertFromBnToInt(allocationDataBefore[ALLOCATION.balance]);
@@ -391,7 +391,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The founder can release their vested amount', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
 
     const allocationDataBefore = await teamDistributionInstance.allocations(FOUNDER_ACCOUNT);
     const allocationBalanceBeforeRelease = convertFromBnToInt(allocationDataBefore[ALLOCATION.balance]);
@@ -421,7 +421,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The the owner can revoke a seed investor\'s vesting', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
 
     const timeTravelTransaction = await timeTravel(3600 * 24 * 30 * 1); // Travel 1 month into the future for testing
     await mineBlock();
@@ -457,7 +457,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The team member can release all their vested funds when the vesting time is complete', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
 
     const allocationDataBefore = await teamDistributionInstance.allocations(TEAM_MEMEBER_ACCOUNT);
     const allocationBalanceBeforeRelease = convertFromBnToInt(allocationDataBefore[6]);
@@ -486,7 +486,7 @@ contract('Team Distribution', async (accounts)=> {
 
   it('The founder can release all their vested funds when the vesting time is complete', async ()=> {
     const teamDistributionInstance = await TeamDistribution.deployed();
-    const tokenInstance = await LightstreamToken.deployed();
+    const tokenInstance = await LightstreamsToken.deployed();
 
     const allocationDataBefore = await teamDistributionInstance.allocations(FOUNDER_ACCOUNT);
     const allocationBalanceBeforeRelease = convertFromBnToInt(allocationDataBefore[6]);

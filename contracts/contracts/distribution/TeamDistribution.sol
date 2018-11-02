@@ -2,7 +2,7 @@ pragma solidity ^0.4.24;
 
 import '../token/SafeERC20.sol';
 import '../token/ERC20.sol';
-import '../LightstreamToken.sol';
+import '../LightstreamsToken.sol';
 import '../utils/SafeMath.sol';
 import '../utils/Ownable.sol';
 
@@ -92,8 +92,8 @@ contract TeamDistribution is Ownable {
     require(allocation.startTimestamp == 0, 'start timestamp');
 
     // prevent an allocation from being larger than the balance of the contract
-    ERC20 lightstreamToken = ERC20(token);
-    uint256 teamDistributionBalance = lightstreamToken.balanceOf(address(this));
+    ERC20 LightstreamsToken = ERC20(token);
+    uint256 teamDistributionBalance = LightstreamsToken.balanceOf(address(this));
     require(teamDistributionBalance >= _totalAllocated, 'teamDistributionBalance');
 
     // TEAM

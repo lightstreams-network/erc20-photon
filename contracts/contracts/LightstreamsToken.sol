@@ -4,7 +4,7 @@ import "./token/MintableToken.sol";
 import "./token/PausableToken.sol";
 import "./token/CappedToken.sol";
 
-contract LightstreamToken is MintableToken, PausableToken, CappedToken {
+contract LightstreamsToken is MintableToken, PausableToken, CappedToken {
 
   string public constant name = "Lightstream Token";
   string public constant symbol = "PHT";

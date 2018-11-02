@@ -7,7 +7,7 @@ import "../utils/SafeMath.sol";
 import "../utils/Ownable.sol";
 import "../distribution/MonthlyVestingWithBonus.sol";
 import "../lifecycle/Pausable.sol";
-import "../LightstreamToken.sol";
+import "../LightstreamsToken.sol";
 
 
 /**
@@ -203,8 +203,8 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    */
   function updateTokenOwner(address _newOwnerAddress) public onlyOwner {
     require(_newOwnerAddress != address(0));
-    LightstreamToken lightstreamToken = LightstreamToken(token);
-    lightstreamToken.transferOwnership(_newOwnerAddress);
+    LightstreamsToken LightstreamsToken = LightstreamsToken(token);
+    LightstreamsToken.transferOwnership(_newOwnerAddress);
   }
 
 
