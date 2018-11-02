@@ -103,6 +103,7 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    * @dev fallback function ***DO NOT OVERRIDE***
    */
   function () external payable {
+    require(msg.data.length == 0);
     buyTokens(msg.sender);
   }
 

@@ -43,7 +43,8 @@ contract TokenCappedCrowdsale is Crowdsale {
   {
     super._preValidatePurchase(_beneficiary, _weiAmount);
     uint256 tokensPurchasing = super._getTokenAmount(_weiAmount);
-    require(tokensSold.add(tokensPurchasing) <= tokenCap, 'tokenCap');
+    uint256 bonus = super._getBonus(tokensPurchasing);
+    require(tokensSold.add(tokensPurchasing).add(bonus) <= tokenCap, 'tokenCap');
   }
 
   function _preValidateMintAndVest(

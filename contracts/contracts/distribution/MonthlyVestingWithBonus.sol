@@ -165,7 +165,7 @@ contract MonthlyVestingWithBonus is Ownable {
   function transferRevokedTokens(address _recipient, uint256 _amount) public onlyOwner {
     require(_amount <= revokedAmount);
     require(_recipient != address(0));
-
+    revokedAmount = revokedAmount.sub(_amount);
     require(vestedToken.transfer(_recipient, _amount));
   }
 
@@ -185,14 +185,13 @@ contract MonthlyVestingWithBonus is Ownable {
   }
 
   function updateVestingSchedule(address _beneficiary, uint256 _totalPurchased, uint256 _initialBonus) public onlyOwner {
-    require(vestingSchedules[_beneficiary].startTimestamp != 0);
-    require(vestingSchedules[_beneficiary].initialAmount >= _totalPurchased);
-    require(vestingSchedules[_beneficiary].initialBonus >=  _initialBonus);
-
     VestingSchedule memory vestingSchedule = vestingSchedules[_beneficiary];
-
-    uint256 totalPurchaseDifference = vestingSchedule.initialAmount.sub(_totalPurchased);
-    uint256 totalBonusDifference = vestingSchedule.initialBonus.sub(_initialBonus);
+    require(vestingSchedule.startTimestamp != 0);
+    require(vestingSchedule.initialAmount.sub(vestingSchedule.initialAmountClaimed) >= _totalPurchased);
+    require(vestingSchedule.initialBonus.sub(vestingSchedule.bonusClaimed) >=  _initialBonus);
+    
+    uint256 totalPurchaseDifference = vestingSchedule.initialAmount.sub(vestingSchedule.initialAmountClaimed).sub(_totalPurchased);
+    uint256 totalBonusDifference = vestingSchedule.initialBonus.sub(vestingSchedule.bonusClaimed).sub(_initialBonus);
 
     revokedAmount = revokedAmount.add(totalPurchaseDifference).add(totalBonusDifference);
 

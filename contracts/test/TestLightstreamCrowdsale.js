@@ -44,6 +44,10 @@ const convertEtherToWeiBN = function (ether) {
   return web3._extend.utils.toBigNumber(etherInWei);
 }
 
+const intToBN = function(i) {
+  return web3._extend.utils.toBigNumber(i);
+}
+
 const RATE = 1000;
 
 const VESTING_SCHEDULE = {
@@ -1104,4 +1108,17 @@ contract('Crowdsale', async (accounts) => {
     return assert.isRejected(crowdsaleInstance.release(CONTRIBUTOR_2_ACCOUNT, {from: CONTRIBUTOR_2_ACCOUNT}));
   });
 
+  it('should prevent more revoked tokens from being transferred than exist in the revocation pool', async () => {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const revokedAmount = convertFromBnToInt(await crowdsaleInstance.revokedAmount.call());
+    return assert.isRejected(crowdsaleInstance.transferRevokedTokens('0x0000000000000000000000000000000000000001', convertEtherToWeiBN(revokedAmount + 1)));
+  });
+
+  it('should allow transfers of revoked tokens from the revocation pool', async () => {
+    const crowdsaleInstance = await LightstreamCrowdsale.deployed();
+    const revokedAmount = convertFromBnToInt(await crowdsaleInstance.revokedAmount.call());
+    await crowdsaleInstance.transferRevokedTokens('0x0000000000000000000000000000000000000001', convertEtherToWeiBN(revokedAmount));
+    const revokedAfter = await crowdsaleInstance.revokedAmount.call();
+    assert.equal(convertFromBnToInt(revokedAfter), 0);
+  });
 });
