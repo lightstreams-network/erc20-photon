@@ -1,5 +1,5 @@
-var Token = artifacts.require("./LightstreamToken.sol");
-var Sale = artifacts.require("./LightstreamCrowdsale.sol");
+var Token = artifacts.require("./LightstreamsToken.sol");
+var Sale = artifacts.require("./LightstreamsCrowdsale.sol");
 var Distribution = artifacts.require("./distribution/TeamDistribution.sol");
 
 let timeOffset = 3600 * 24 * 30; // 30 days

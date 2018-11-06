@@ -7,7 +7,7 @@ import "../utils/SafeMath.sol";
 import "../utils/Ownable.sol";
 import "../distribution/MonthlyVestingWithBonus.sol";
 import "../lifecycle/Pausable.sol";
-import "../LightstreamToken.sol";
+import "../LightstreamsToken.sol";
 
 
 /**
@@ -78,6 +78,8 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
     uint256 bonus
   );
 
+  event FundsReceivedOnFallback(address sender, uint256 value);
+
   /**
    * @param _rate Number of token units a buyer gets per wei
    * @param _wallet Address where collected funds will be forwarded to
@@ -104,7 +106,8 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    */
   function () external payable {
     require(msg.data.length == 0);
-    buyTokens(msg.sender);
+    emit FundsReceivedOnFallback(msg.sender, msg.value);
+    _forwardFunds();
   }
 
   /**
@@ -187,8 +190,11 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    */
   function refundTokens(address _recipient, address _token) public onlyOwner {
     require(_token != address(token));
+    require(_recipient != address(0));
+    require(_token != address(0));
     ERC20 refundToken = ERC20(_token);
     uint256 balance = refundToken.balanceOf(this);
+    require(balance > 0);
     require(refundToken.transfer(_recipient, balance));
   }
 
@@ -200,8 +206,8 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    */
   function updateTokenOwner(address _newOwnerAddress) public onlyOwner {
     require(_newOwnerAddress != address(0));
-    LightstreamToken lightstreamToken = LightstreamToken(token);
-    lightstreamToken.transferOwnership(_newOwnerAddress);
+    LightstreamsToken LightstreamsToken = LightstreamsToken(token);
+    LightstreamsToken.transferOwnership(_newOwnerAddress);
   }
 
 

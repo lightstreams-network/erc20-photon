@@ -2,7 +2,7 @@ pragma solidity ^0.4.24;
 
 import '../token/SafeERC20.sol';
 import '../token/ERC20.sol';
-import '../LightstreamToken.sol';
+import '../LightstreamsToken.sol';
 import '../utils/SafeMath.sol';
 import '../utils/Ownable.sol';
 
