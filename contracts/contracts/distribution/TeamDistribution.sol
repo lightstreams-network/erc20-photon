@@ -92,8 +92,8 @@ contract TeamDistribution is Ownable {
     require(allocation.startTimestamp == 0, 'start timestamp');
 
     // prevent an allocation from being larger than the balance of the contract
-    ERC20 LightstreamsToken = ERC20(token);
-    uint256 teamDistributionBalance = LightstreamsToken.balanceOf(address(this));
+    ERC20 lsToken = ERC20(token);
+    uint256 teamDistributionBalance = lsToken.balanceOf(address(this));
     require(teamDistributionBalance >= _totalAllocated, 'teamDistributionBalance');
 
     // TEAM

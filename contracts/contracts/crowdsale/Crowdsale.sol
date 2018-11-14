@@ -206,8 +206,8 @@ contract Crowdsale is Ownable, MonthlyVestingWithBonus, Pausable {
    */
   function updateTokenOwner(address _newOwnerAddress) public onlyOwner {
     require(_newOwnerAddress != address(0));
-    LightstreamsToken LightstreamsToken = LightstreamsToken(token);
-    LightstreamsToken.transferOwnership(_newOwnerAddress);
+    LightstreamsToken lsToken = LightstreamsToken(token);
+    lsToken.transferOwnership(_newOwnerAddress);
   }
 
 
